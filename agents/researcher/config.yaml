@@ -8,8 +8,9 @@ mcp_servers:
       - "tools.trade_mcp.server"
     env:
       PYTHONPATH: "__REPO_ROOT__"
+      TRADE_GOV_API_KEY: "${TRADE_GOV_API_KEY}"
     enabled: true
 
 platform_toolsets:
   cli:
-    - mcp-trade-compliance
+    - trade-compliance

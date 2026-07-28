@@ -7,10 +7,39 @@ from __future__ import annotations
 
 import json
 import os
+import time
 
 import httpx
 
 TRADE_GOV_SEARCH_URL = "https://data.trade.gov/consolidated_screening_list/v1/search"
+
+# Both external APIs are hit exactly once per tool call, over the open internet, from a
+# long-lived stdio subprocess — a one-off DNS/connection blip shouldn't turn into a fabricated
+# "no data" or an unhelpful error the model then has to explain to the user. Retry ONLY on
+# transport-level failures (httpx.HTTPError: timeouts, DNS resolution, connection resets, bad
+# status codes) — never on a successful, parsed response, even an empty one. An empty result is
+# a real answer ("no matches found" / "no data available"), not a failure to retry.
+_MAX_ATTEMPTS = 2
+_RETRY_BACKOFF_SECONDS = 1.0
+
+
+def _get_with_retry(url: str, *, params: dict, headers: dict, timeout: float) -> httpx.Response:
+    """GET with a single retry (2 attempts total) and a short fixed backoff between them.
+
+    Raises the last httpx.HTTPError if both attempts fail — callers catch that the same way
+    they'd catch a single failed request, so the external {"error": ...} contract is unchanged.
+    """
+    last_exc: httpx.HTTPError | None = None
+    for attempt in range(1, _MAX_ATTEMPTS + 1):
+        try:
+            response = httpx.get(url, params=params, headers=headers, timeout=timeout)
+            response.raise_for_status()
+            return response
+        except httpx.HTTPError as exc:
+            last_exc = exc
+            if attempt < _MAX_ATTEMPTS:
+                time.sleep(_RETRY_BACKOFF_SECONDS)
+    raise last_exc
 
 
 def fetch_screen_party(name: str) -> dict:
@@ -22,13 +51,12 @@ def fetch_screen_party(name: str) -> dict:
         return {"error": "TRADE_GOV_API_KEY is not set"}
 
     try:
-        response = httpx.get(
+        response = _get_with_retry(
             TRADE_GOV_SEARCH_URL,
             params={"name": name, "fuzzy_name": "true"},
             headers={"subscription-key": api_key},
             timeout=15.0,
         )
-        response.raise_for_status()
         payload = response.json()
     except (httpx.HTTPError, json.JSONDecodeError) as exc:
         return {"error": f"screening API error: {exc}"}
@@ -70,7 +98,7 @@ def fetch_trade_data(reporter_country: str, partner_country: str, hs_code: str, 
         return {"error": f"unrecognized country: {partner_country}"}
 
     try:
-        response = httpx.get(
+        response = _get_with_retry(
             COMTRADE_URL,
             params={
                 "reporterCode": reporter_code,
@@ -79,9 +107,9 @@ def fetch_trade_data(reporter_country: str, partner_country: str, hs_code: str, 
                 "flowCode": "X",
                 "cmdCode": hs_code,
             },
+            headers={},
             timeout=15.0,
         )
-        response.raise_for_status()
         rows = response.json().get("data", [])
     except (httpx.HTTPError, json.JSONDecodeError) as exc:
         return {"error": f"trade data API error: {exc}"}

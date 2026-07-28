@@ -47,7 +47,6 @@ def fetch_screen_party(name: str) -> dict:
     return {"matched": True, "hits": hits}
 
 
-import json
 from pathlib import Path
 
 COMTRADE_URL = "https://comtradeapi.un.org/public/v1/preview/C/A/HS"

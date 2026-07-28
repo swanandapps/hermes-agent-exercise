@@ -20,27 +20,42 @@ from fastapi.staticfiles import StaticFiles
 REPO_ROOT = Path(__file__).resolve().parent.parent
 GATEWAY_URL = os.environ.get("HERMES_GATEWAY_URL", "http://127.0.0.1:8642")
 GATEWAY_KEY = os.environ.get("API_SERVER_KEY", "")
-MODEL = os.environ.get("MODEL", "openai")
-MODE = os.environ.get("HERMES_MODE", "single")
+PROFILE_NAME = os.environ.get("HERMES_PROFILE", "hermes-exercise")
+PROFILE_CONFIG = Path.home() / ".hermes" / "profiles" / PROFILE_NAME / "config.yaml"
 
 app = FastAPI(title="Trade Compliance Researcher")
 
 
-def _model_name() -> str:
-    """The concrete model id from the active provider overlay (e.g. gpt-5-mini)."""
-    overlay = REPO_ROOT / "config" / f"model.{MODEL}.yaml"
-    if not overlay.exists():
-        return MODEL
+def _live_config() -> dict:
+    """Read what the gateway is ACTUALLY running, from the profile it loaded.
+
+    Not from this process's own env vars: the backend and the gateway are separate
+    processes, and `run.py` can re-sync the profile to a different provider without
+    the backend ever knowing. During the Part 3 demo the header is the only on-screen
+    evidence that the model really changed, so it has to read the same file the
+    gateway did — anything else can quietly disagree with reality.
+    """
+    if not PROFILE_CONFIG.exists():
+        return {}
     try:
-        return (yaml.safe_load(overlay.read_text()) or {}).get("model", {}).get("default", MODEL)
-    except Exception:
-        return MODEL
+        return yaml.safe_load(PROFILE_CONFIG.read_text()) or {}
+    except (OSError, yaml.YAMLError):
+        return {}
 
 
 @app.get("/api/config")
 def get_config() -> dict:
-    """What the header displays: which model and which mode are actually running."""
-    return {"model": _model_name(), "provider": MODEL, "mode": MODE}
+    """What the header displays: the model and mode the gateway actually loaded."""
+    cfg = _live_config()
+    model = cfg.get("model") or {}
+    cli_toolsets = ((cfg.get("platform_toolsets") or {}).get("cli")) or []
+    return {
+        "model": model.get("default", "unknown"),
+        "provider": model.get("provider", "unknown"),
+        # Handoff mode is defined by delegation being available, which is a fact
+        # about the loaded config rather than something we can assert from outside.
+        "mode": "handoff" if "delegation" in cli_toolsets else "single",
+    }
 
 
 @app.post("/api/chat")
@@ -53,7 +68,7 @@ async def chat(request: Request) -> StreamingResponse:
     """
     body = await request.json()
     payload = {
-        "model": _model_name(),
+        "model": get_config()["model"],
         "messages": body.get("messages", []),
         "stream": True,
     }

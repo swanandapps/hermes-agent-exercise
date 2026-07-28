@@ -1,0 +1,9 @@
+# Model overlay — OPEN-WEIGHT via CLOUD endpoint (OpenRouter). MODEL=openrouter.
+# This carries the REAL inference for the live demo (the 8GB laptop can't host a 64K model locally).
+# Pick TWO different open models across the exercise, e.g. Qwen here + Llama via Ollama.
+model:
+  provider: custom
+  default: qwen/qwen-2.5-72b-instruct     # or meta-llama/llama-3.1-70b-instruct, mistralai/mistral-large
+  base_url: https://openrouter.ai/api/v1
+  key_env: OPENROUTER_API_KEY
+  context_length: 65536

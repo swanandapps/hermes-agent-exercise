@@ -1,0 +1,22 @@
+# Part 3 — run the workflow WITHOUT Anthropic.
+#   MODEL=ollama     docker compose up      # fully self-hosted (local open weights)
+#   MODEL=openrouter docker compose up      # open weights via a cloud endpoint
+services:
+  ollama:
+    image: ollama/ollama:latest
+    ports: ["11434:11434"]
+    volumes: ["ollama:/root/.ollama"]
+    # First run: `docker compose exec ollama ollama pull qwen2.5:3b`
+
+  app:
+    build: .
+    environment:
+      - MODEL=${MODEL:-ollama}
+      - OPENAI_API_KEY=${OPENAI_API_KEY:-}
+      - OPENROUTER_API_KEY=${OPENROUTER_API_KEY:-}
+      - OLLAMA_API_KEY=ollama
+    depends_on: [ollama]
+    # TODO: command that runs the workflow, e.g. ["python", "run.py", "--mode", "handoff"]
+
+volumes:
+  ollama:

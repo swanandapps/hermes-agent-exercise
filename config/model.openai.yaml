@@ -1,0 +1,9 @@
+# Model overlay — HOSTED (OpenAI). Selected by MODEL=openai. Part-3 swap = pick a different overlay.
+# NOTE: Hermes has no "openai" provider — use `custom`. The model MUST be a reasoning model
+# (gpt-4o-mini rejects Hermes's reasoning.effort with HTTP 400). Verified working.
+model:
+  provider: custom
+  default: gpt-5-mini
+  base_url: https://api.openai.com/v1
+  key_env: OPENAI_API_KEY
+  context_length: 128000

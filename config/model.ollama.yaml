@@ -1,0 +1,9 @@
+# Model overlay — OPEN-WEIGHT, SELF-HOSTED local (Ollama). MODEL=ollama. The "self-hostable" proof.
+# 8GB laptop can't do a 64K-context model locally (Hermes's floor), so use a SMALL model for the local
+# demo and let OpenRouter carry the heavy runs. `ollama pull qwen2.5:3b` first.
+model:
+  provider: custom
+  default: qwen2.5:3b                       # or llama3.2:3b — a second open model for the "two models" ask
+  base_url: http://localhost:11434/v1
+  key_env: OLLAMA_API_KEY                   # any value; Ollama ignores the key
+  context_length: 32768

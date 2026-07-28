@@ -166,8 +166,10 @@ export function verdictOf(text: string): Verdict | null {
   // is not a verdict. It also varies the wording — "Hit", "Hit found", "Blocked" —
   // so match on the leading word, anchored, rather than one exact phrase.
   const head = firstLine.replace(/^direct answer:\s*/i, "").trimStart();
-  if (/^(hit|blocked|flagged)\b/i.test(head)) return "hit";
-  if (/^(cleared|clear|no match)\b/i.test(head)) return "cleared";
-  if (/^no data\b/i.test(head)) return "nodata";
+  // Single mode: the Researcher answers directly. Handoff mode: the Writer's memo
+  // opens with a deal-desk decision instead. Both vocabularies map to the same channels.
+  if (/^(hit|blocked|flagged|do not proceed)\b/i.test(head)) return "hit";
+  if (/^(cleared|clear|no match|proceed)\b/i.test(head)) return "cleared";
+  if (/^(no data|insufficient data)\b/i.test(head)) return "nodata";
   return null;
 }

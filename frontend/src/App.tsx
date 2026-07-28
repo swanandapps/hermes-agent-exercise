@@ -274,10 +274,13 @@ function Finding({ exchange, index }: { exchange: Exchange; index: number }) {
  *  can report the actual source being consulted rather than a generic message. */
 function waitingLabel(exchange: Exchange): string {
   const running = exchange.tools.filter((t) => t.status === "running");
-  if (running.length === 1) return `Consulting ${toolLabel(running[0].tool)}…`;
-  if (running.length > 1) {
-    return `Consulting ${running.map((t) => toolLabel(t.tool)).join(" and ")}…`;
-  }
+  const names = running.map((t) => toolLabel(t.tool));
+  // Delegation isn't a source lookup — it's the handoff, and it's the slowest step,
+  // so name it for what it is rather than burying it in "consulting".
+  if (names.includes("delegate_task")) return "Handing off to the Writer…";
+  if (names.includes("memory")) return "Recording the finding…";
+  if (names.length === 1) return `Consulting ${names[0]}…`;
+  if (names.length > 1) return `Consulting ${names.join(" and ")}…`;
   if (exchange.tools.length > 0) return "Reading results…";
   return "Deciding which sources to consult…";
 }

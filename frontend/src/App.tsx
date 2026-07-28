@@ -18,6 +18,8 @@ interface Exchange {
   answer: string;
   tools: ToolCall[];
   detail?: TurnDetail;
+  /** Arrives on the stream at the end of the turn, when the model emits one. */
+  reasoning?: string;
   error?: string;
   done: boolean;
   askedAt: Date;
@@ -95,6 +97,7 @@ export default function App() {
               ),
             };
           }),
+        onReasoning: (text) => patch((e) => ({ ...e, reasoning: text })),
         onError: (message) => patch((e) => ({ ...e, error: message })),
       });
     } catch (err) {
@@ -211,7 +214,7 @@ function Finding({ exchange, index }: { exchange: Exchange; index: number }) {
           {exchange.answer ? (
             <p>{exchange.answer.replace(/^\s+/, "")}</p>
           ) : exchange.error ? null : (
-            <p className="finding__waiting">Consulting sources…</p>
+            <p className="finding__waiting">{waitingLabel(exchange)}</p>
           )}
           {!exchange.done && exchange.answer && <span className="caret" aria-hidden="true" />}
         </div>
@@ -222,7 +225,9 @@ function Finding({ exchange, index }: { exchange: Exchange; index: number }) {
           </div>
         )}
 
-        {exchange.detail?.reasoning && <Reasoning text={exchange.detail.reasoning} />}
+        {(exchange.reasoning || exchange.detail?.reasoning) && (
+          <Reasoning text={exchange.reasoning || exchange.detail!.reasoning} />
+        )}
 
         {exchange.tools.length > 0 && (
           <div className="sources">
@@ -263,6 +268,18 @@ function Finding({ exchange, index }: { exchange: Exchange; index: number }) {
       </div>
     </article>
   );
+}
+
+/** Name what the agent is doing right now. Tool events arrive live, so the wait
+ *  can report the actual source being consulted rather than a generic message. */
+function waitingLabel(exchange: Exchange): string {
+  const running = exchange.tools.filter((t) => t.status === "running");
+  if (running.length === 1) return `Consulting ${toolLabel(running[0].tool)}…`;
+  if (running.length > 1) {
+    return `Consulting ${running.map((t) => toolLabel(t.tool)).join(" and ")}…`;
+  }
+  if (exchange.tools.length > 0) return "Reading results…";
+  return "Deciding which sources to consult…";
 }
 
 /** Pull the error message out of a tool's JSON payload for a one-line summary. */

@@ -59,6 +59,9 @@ export function formatArgs(raw: string): string {
 export interface StreamHandlers {
   onDelta(text: string): void;
   onTool(call: { tool: string; toolCallId: string; status: "running" | "completed" }): void;
+  /** Hermes delivers reasoning as one block when the turn finishes — never as
+   *  incremental deltas — so this fires at most once, near the end. */
+  onReasoning(text: string): void;
   onError(message: string): void;
 }
 
@@ -134,6 +137,12 @@ function handleFrame(frame: string, handlers: StreamHandlers): void {
 
   if (event === "hermes.tool.progress") {
     if (payload?.tool && payload?.toolCallId) handlers.onTool(payload);
+    return;
+  }
+  if (event === "reasoning.available") {
+    if (typeof payload?.text === "string" && payload.text.trim()) {
+      handlers.onReasoning(payload.text);
+    }
     return;
   }
   if (event === "app.error") {

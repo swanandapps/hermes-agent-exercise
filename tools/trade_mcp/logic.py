@@ -5,6 +5,7 @@ the network in tests.
 """
 from __future__ import annotations
 
+import json
 import os
 
 import httpx
@@ -28,10 +29,9 @@ def fetch_screen_party(name: str) -> dict:
             timeout=15.0,
         )
         response.raise_for_status()
-    except httpx.HTTPError as exc:
+        payload = response.json()
+    except (httpx.HTTPError, json.JSONDecodeError) as exc:
         return {"error": f"screening API error: {exc}"}
-
-    payload = response.json()
     results = payload.get("results", [])   # adjust key name if Step 1 found a different one
     if not results:
         return {"matched": False, "hits": [], "message": "no matches found"}

@@ -1,9 +1,18 @@
-# Model overlay — OPEN-WEIGHT via CLOUD endpoint (OpenRouter). MODEL=openrouter.
-# This carries the REAL inference for the live demo (the 8GB laptop can't host a 64K model locally).
-# Pick TWO different open models across the exercise, e.g. Qwen here + Llama via Ollama.
+# Model overlay — OPEN-WEIGHT via a CLOUD endpoint (OpenRouter). Selected by MODEL=openrouter.
+#
+# This carries the real inference for the live demo. Hermes enforces a 64K minimum context
+# (agent/model_metadata.py: MINIMUM_CONTEXT_LENGTH) and this project's system prompt alone runs
+# ~30K tokens, so a small locally-hosted model cannot serve the full agent on an 8GB machine.
+# Ollama (config/model.ollama.yaml) is the self-hostable proof; this is the working backend.
+#
+# Qwen3-32B: Apache-2.0 weights, self-hostable on a single large GPU, 131K context, and among the
+# more reliable open models at tool calling — the thing that actually has to survive the swap,
+# since every answer in this agent comes from a tool call.
+#
+# `provider: openrouter` is Hermes's native provider (plugins/model-providers/openrouter), not the
+# generic `custom` one — it carries per-model-family reasoning-parameter handling.
 model:
-  provider: custom
-  default: qwen/qwen-2.5-72b-instruct     # or meta-llama/llama-3.1-70b-instruct, mistralai/mistral-large
-  base_url: https://openrouter.ai/api/v1
+  provider: openrouter
+  default: qwen/qwen3-32b
   key_env: OPENROUTER_API_KEY
-  context_length: 65536
+  context_length: 131072

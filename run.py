@@ -89,6 +89,11 @@ def _sync_profile(mode: str = "single") -> None:
         )
         merged = _deep_merge(merged, handoff_overlay)
     merged = _deep_merge(merged, model_overlay)
+    # A provider config is atomic — merging it key-by-key leaves stale settings from the
+    # previous provider behind. Switching OpenAI -> OpenRouter kept OpenAI's base_url,
+    # which silently points an open-weight model at the wrong endpoint. Replace outright.
+    if "model" in model_overlay:
+        merged["model"] = model_overlay["model"]
 
     profile_config_path.write_text(yaml.safe_dump(merged, sort_keys=False))
     (PROFILE_HOME / "SOUL.md").write_text(_researcher_soul(mode))

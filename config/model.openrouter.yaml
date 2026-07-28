@@ -16,8 +16,9 @@ model:
   default: qwen/qwen3-32b
   key_env: OPENROUTER_API_KEY
   context_length: 131072
-  # Hermes defaults to requesting 65,536 output tokens per call. OpenRouter reserves
-  # credit against that ceiling, so a request can be refused for "insufficient credits"
-  # while the answer it would have produced costs a fraction of a cent. A compliance
-  # memo is ~1,500 tokens; 4,096 is generous headroom.
-  max_tokens: 4096
+  # Hermes defaults to requesting 65,536 output tokens per call. OpenRouter reserves credit
+  # against that ceiling, so requests get refused for "insufficient credits" while the answer
+  # they would produce costs a fraction of a cent. Capped — but not too tightly: Qwen3 is a
+  # reasoning model, and thinking tokens plus a delegation call carrying the Writer's persona
+  # need real headroom. 4,096 was too small.
+  max_tokens: 16384

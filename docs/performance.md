@@ -150,13 +150,92 @@ HTTP 402: You requested up to 65536 tokens, but can only afford 48357
 over-reservation. This does not reduce tokens *used*; it stops the provider blocking requests
 against tokens that were never going to be consumed.
 
-### Remaining levers, not yet applied
+### What the 80,000 tokens are actually made of
 
-- **Trim tool results.** `screen_party` returns all nine Rosneft matches with full fields, and
-  every one is re-sent on each subsequent model call in the turn. Collapsing to the three unique
-  source lists would cut the largest repeated payload.
-- **Fewer toolsets.** Handoff mode adds `delegation`, `memory` and `session_search`; each tool
-  schema is prompt budget on every call. Single mode is meaningfully cheaper.
-- **Delegation is not free.** The Writer is a full agent with its own system prompt, so the
-  handoff pays that prefix a second time. It buys context isolation and an independent reasoning
-  budget — worth it here, but it is a real cost, not a formatting step.
+An earlier draft of this page blamed verbose tool results. Measurement disproved it, and the
+real answer is more useful.
+
+Dumping the stored session for a complete handoff turn:
+
+| Part of the turn | Chars | ≈ Tokens |
+|---|---|---|
+| User question | 175 | 44 |
+| `screen_party` result | 533 | 133 |
+| `trade_data_lookup` result | 956 | 239 |
+| `memory` result | 194 | 49 |
+| Delegation call + Writer's memo returned | 2,396 | 599 |
+| Final answer | 608 | 152 |
+| **Entire conversation** | **5,855** | **~1,463** |
+
+The turn billed **80,111 prompt tokens**. The conversation is under 2% of it.
+
+**`prompt_tokens` is the sum across every model call in the turn, and each call re-sends the
+whole system prompt.** That turn made five model calls — decide, look up trade data, record to
+memory, delegate, relay — and 5 × ~16,210 ≈ 81,000. That is the entire bill.
+
+Measured system prompt, this profile, bundled skills already removed:
+
+| Mode | Toolsets | Prompt tokens per call |
+|---|---|---|
+| `single` | `trade-compliance` | **14,674** |
+| `handoff` | `+ delegation, memory, session_search` | **16,210** |
+
+So the three extra toolsets cost 1,536 tokens per call — real, but small next to the ~14.7 K
+floor of Hermes's own core tool schemas and scaffolding.
+
+### Levers, ranked by measured impact
+
+1. **Remove bundled skills** — 5,163 per call, ~26 K per turn. **Tried, reverted: it breaks
+   delegation.** See below.
+2. **Make fewer model calls.** Every avoided round trip saves a whole system prompt (~16 K).
+   **Tried, reverted:** instructing the Researcher to batch its two lookups did cut the turn to
+   47,817 tokens — but it achieved that by silently skipping delegation and memory entirely,
+   and leaked the Writer's persona as the answer. A cheaper turn that does less work is not an
+   optimisation.
+3. **Drop toolsets you are not using** — 1,536 per call, ~7.7 K per turn, but only available if
+   you give up delegation or memory.
+4. **Trim tool results** — ~161 tokens across the whole turn. Not worth touching.
+
+### The skills/delegation trade-off
+
+Disabling the 17 bundled skills is the largest single saving available, and it **breaks the
+handoff on Qwen3-32B**. With skills removed, Qwen stopped emitting `delegate_task` as a
+structured tool call and started emitting it as text — the exact failure mode Llama-3.1-8B
+showed:
+
+```
+delegate_task(
+goal="You are a trade compliance officer writing a due-diligence memo …
+```
+
+`delegate_task` never fired, no Writer was spawned, and the persona leaked into the user-facing
+answer. Restoring the skills directory fixed it immediately, on the same model and the same
+query. Nothing else changed.
+
+The likely mechanism is that one of the bundled skills (`hermes-agent`, which Qwen's own
+reasoning trace mentions consulting) carries guidance on Hermes's internal tool conventions,
+including delegation. An open model appears to lean on it; the hosted model did not need it.
+
+So the 24% saving is real and unusable here. **Skills stay enabled.** The honest framing for
+anyone tuning this: prompt-size optimisations and instruction-following reliability trade
+against each other, and on open-weight models the margin is thin enough that a 24% saving can
+cost you a whole agent.
+
+### Both false economies had the same shape
+
+Three separate times in this exercise, something looked like a win because it did less work:
+
+- Llama-3.1-8B "finished in 21 s" — by never delegating.
+- Batching instructions cut the turn 40% — by never delegating.
+- Removing skills cut 24% per call — by breaking delegation.
+
+Latency and token counts are only comparable between runs that produced the same deliverable.
+Measure the output first, the cost second.
+
+The counter-intuitive result: in an agentic loop, **what you send is dominated by how many times
+you send it**, not by how much the tools return. Optimising payloads is the obvious instinct and
+the wrong one.
+
+**Delegation is not free either.** The Writer is a full agent with its own system prompt, so a
+handoff pays that prefix again inside the child. It buys context isolation and an independent
+reasoning budget — worth it here, but it is a real cost, not a formatting step.

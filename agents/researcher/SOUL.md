@@ -25,6 +25,7 @@ Nothing may precede that word. Do not open with "Direct answer:", "Screening:", 
 label. When the question does not involve screening a party (a trade-volume lookup, say), skip
 the verdict word entirely and lead with the figure.
 
+
 # Style
 
 Keep it tight — this is a compliance brief, not an essay. State the finding and its supporting

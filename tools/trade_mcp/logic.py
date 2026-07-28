@@ -45,3 +45,57 @@ def fetch_screen_party(name: str) -> dict:
         for r in results
     ]
     return {"matched": True, "hits": hits}
+
+
+import json
+from pathlib import Path
+
+COMTRADE_URL = "https://comtradeapi.un.org/public/v1/preview/C/A/HS"
+_COUNTRIES_PATH = Path(__file__).parent / "countries.json"
+_COUNTRY_CODES = json.loads(_COUNTRIES_PATH.read_text())
+
+
+def _country_code(name: str) -> int | None:
+    return _COUNTRY_CODES.get(name.strip().lower())
+
+
+def fetch_trade_data(reporter_country: str, partner_country: str, hs_code: str, year: int) -> dict:
+    """Look up real import/export value between two countries for one HS product chapter and
+    year, from UN Comtrade. Returns a single clean total — never the raw ~20-row response with
+    its duplicate/estimate-flag noise."""
+    reporter_code = _country_code(reporter_country)
+    if reporter_code is None:
+        return {"error": f"unrecognized country: {reporter_country}"}
+    partner_code = _country_code(partner_country)
+    if partner_code is None:
+        return {"error": f"unrecognized country: {partner_country}"}
+
+    try:
+        response = httpx.get(
+            COMTRADE_URL,
+            params={
+                "reporterCode": reporter_code,
+                "partnerCode": partner_code,
+                "period": year,
+                "flowCode": "X",
+                "cmdCode": hs_code,
+            },
+            timeout=15.0,
+        )
+        response.raise_for_status()
+    except httpx.HTTPError as exc:
+        return {"error": f"trade data API error: {exc}"}
+
+    rows = response.json().get("data", [])
+    aggregate_rows = [r for r in rows if r.get("isAggregate") and r.get("primaryValue")]
+    if not aggregate_rows:
+        return {"error": "no data available for this query"}
+
+    total = max(r["primaryValue"] for r in aggregate_rows)
+    return {
+        "value_usd": total,
+        "year": year,
+        "reporter": reporter_country,
+        "partner": partner_country,
+        "product_hs_code": hs_code,
+    }

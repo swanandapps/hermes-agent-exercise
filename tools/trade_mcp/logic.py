@@ -82,10 +82,10 @@ def fetch_trade_data(reporter_country: str, partner_country: str, hs_code: str, 
             timeout=15.0,
         )
         response.raise_for_status()
-    except httpx.HTTPError as exc:
+        rows = response.json().get("data", [])
+    except (httpx.HTTPError, json.JSONDecodeError) as exc:
         return {"error": f"trade data API error: {exc}"}
 
-    rows = response.json().get("data", [])
     aggregate_rows = [r for r in rows if r.get("isAggregate") and r.get("primaryValue")]
     if not aggregate_rows:
         return {"error": "no data available for this query"}

@@ -1,12 +1,15 @@
 # Part 2 overlay — merged ON TOP of config.yaml by run.py in --mode handoff.
 # Purely additive: Part 1's config is untouched, so --mode single keeps working.
 
+# Listed for both platforms: the CLI and the gateway ("api_server") resolve toolsets
+# independently, and omitting one leaves that surface on the full default set.
 platform_toolsets:
-  cli:
+  cli: &handoff_toolsets
     - trade-compliance   # the two research tools (Part 1)
     - delegation         # delegate_task — the Researcher -> Writer handoff
     - memory             # MEMORY.md / USER.md, written across sessions
     - session_search     # FTS5 recall over past conversations
+  api_server: *handoff_toolsets
 
 memory:
   memory_enabled: true

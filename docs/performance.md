@@ -271,7 +271,11 @@ reasoning budget — worth it here, but it is a real cost, not a formatting step
 
 ## So what is the floor, and what did we actually fix?
 
-**Measured floor for this agent on Hermes: ~21,000 prompt tokens per model call**, and a handoff
+**Superseded — see "The optimisation that actually mattered" below.** The figures in this
+section were measured with the gateway accidentally running Hermes's full default toolset.
+The real floor is ~6,900 per call.
+
+**Measured (mis-measured) floor: ~21,000 prompt tokens per model call**, and a handoff
 turn makes four to five calls — 55,000–80,000 tokens to answer one question.
 
 Where it goes, per call:
@@ -320,3 +324,47 @@ Removing `tool_search` from the repo overlay did not remove it from the live pro
 place downstream — the same class of bug as the `base_url` leak, and it cost an hour of
 misdiagnosis because the running agent no longer matched the repo. Deleting a setting means
 deleting it from the profile config too.
+
+## The optimisation that actually mattered
+
+Everything above about a ~21 K floor and Hermes being "10-20x heavier" was **wrong**, and the
+cause was a misconfiguration in this repo, not the framework.
+
+Toolsets are resolved **per platform** (`hermes_cli/tools_config.py`:
+`platform_toolsets.get(platform)`). The CLI and the gateway are different platforms — the
+gateway identifies itself as `api_server` (`gateway/platforms/api_server.py`). This project set
+only:
+
+```yaml
+platform_toolsets:
+  cli: [trade-compliance, delegation, memory, session_search]
+```
+
+So every request through the web UI fell through to Hermes's **full default toolset** — all 49
+core tools, browser automation and kanban and Home Assistant included. The restriction we
+thought we had was never applied to the surface we were actually demoing. It failed silently:
+no warning, no error, just four times the prompt.
+
+Adding `api_server` with the same list:
+
+| | Prompt tokens per call | Per handoff turn |
+|---|---|---|
+| Before (gateway on default toolset) | **21,373** | 54,600 – 80,111 |
+| After (gateway scoped to 4 toolsets) | **6,932** | **14,400 – 22,700** |
+| Saving | **68%** | **~70%** |
+
+**Reliability improved too**, which is the more interesting result. Delegation success went from
+**4/8 to 3/4** on the identical query and model. Fewer irrelevant tool schemas appears to mean
+less for the model to get lost in — the same intervention bought both cost and correctness.
+Small samples, but the direction matches the mechanism.
+
+### Why this one was worth finding and the other four were not
+
+The four rejected attempts — disabling skills, batching instructions, deferred tool loading,
+capping `max_tokens` hard — all traded capability for tokens. This one removed work that was
+never wanted: tool schemas for a browser, a kanban board and a smart-home integration, in a
+sanctions-screening agent.
+
+The general lesson: before optimising what a system does, check what it is doing that you never
+asked for. A config key that silently doesn't apply is worth more than every prompt-trimming
+trick combined.

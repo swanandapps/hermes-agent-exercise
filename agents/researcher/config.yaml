@@ -11,7 +11,13 @@ mcp_servers:
       TRADE_GOV_API_KEY: "${TRADE_GOV_API_KEY}"
     enabled: true
 
+# Toolsets are looked up per PLATFORM (hermes_cli/tools_config.py). The CLI and the
+# gateway are different platforms — the gateway identifies as "api_server"
+# (gateway/platforms/api_server.py) — so a cli-only entry silently leaves the web UI
+# running Hermes's full default toolset. Both must be listed.
 platform_toolsets:
   cli:
+    - trade-compliance
+  api_server:
     - trade-compliance
 

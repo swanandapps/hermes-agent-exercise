@@ -19,14 +19,22 @@ TRADE_GOV_SEARCH_URL = "https://data.trade.gov/consolidated_screening_list/v1/se
 # transport-level failures (httpx.HTTPError: timeouts, DNS resolution, connection resets, bad
 # status codes) — never on a successful, parsed response, even an empty one. An empty result is
 # a real answer ("no matches found" / "no data available"), not a failure to retry.
-_MAX_ATTEMPTS = 2
-_RETRY_BACKOFF_SECONDS = 1.0
+#
+# 3 attempts with modestly increasing backoff (1s, then 2s between attempts) rather than 2
+# attempts with a single fixed pause: observed live flakiness (data.trade.gov intermittently
+# failing DNS resolution, confirmed as real dual-stack DNS flapping — not a code or environment
+# bug) has also been observed to clear again moments later, so a bit more spacing and one more
+# shot meaningfully raises the odds of landing on a working moment. Deliberately NOT doing
+# anything fancier (manual IPv4 forcing, custom resolution, IP pinning) — this is an ordinary
+# transient-network problem, not one that needs bespoke networking code.
+_MAX_ATTEMPTS = 3
+_RETRY_BACKOFF_SECONDS = (1.0, 2.0)  # wait before attempt 2, then before attempt 3
 
 
 def _get_with_retry(url: str, *, params: dict, headers: dict, timeout: float) -> httpx.Response:
-    """GET with a single retry (2 attempts total) and a short fixed backoff between them.
+    """GET with up to 2 retries (3 attempts total) and modestly increasing backoff between them.
 
-    Raises the last httpx.HTTPError if both attempts fail — callers catch that the same way
+    Raises the last httpx.HTTPError if every attempt fails — callers catch that the same way
     they'd catch a single failed request, so the external {"error": ...} contract is unchanged.
     """
     last_exc: httpx.HTTPError | None = None
@@ -38,7 +46,7 @@ def _get_with_retry(url: str, *, params: dict, headers: dict, timeout: float) ->
         except httpx.HTTPError as exc:
             last_exc = exc
             if attempt < _MAX_ATTEMPTS:
-                time.sleep(_RETRY_BACKOFF_SECONDS)
+                time.sleep(_RETRY_BACKOFF_SECONDS[attempt - 1])
     raise last_exc
 
 

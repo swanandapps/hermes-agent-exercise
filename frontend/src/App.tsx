@@ -229,11 +229,13 @@ function Finding({ exchange, index }: { exchange: Exchange; index: number }) {
           <Reasoning text={exchange.reasoning || exchange.detail!.reasoning} />
         )}
 
-        {exchange.tools.length > 0 && (
+        <Handoff exchange={exchange} />
+
+        {researchTools(exchange).length > 0 && (
           <div className="sources">
             <p className="sources__label">Sources consulted</p>
             <ul>
-              {exchange.tools.map((tool) => {
+              {researchTools(exchange).map((tool) => {
                 const detail = exchange.detail?.calls.find((c) => c.id === tool.toolCallId);
                 const failed = detail?.failed ?? false;
                 return (
@@ -267,6 +269,34 @@ function Finding({ exchange, index }: { exchange: Exchange; index: number }) {
         )}
       </div>
     </article>
+  );
+}
+
+/** delegate_task is a second agent, not a data source — it belongs in its own block,
+ *  not in the list of places we looked things up. */
+function researchTools(exchange: Exchange): ToolCall[] {
+  return exchange.tools.filter((t) => toolLabel(t.tool) !== "delegate_task");
+}
+
+function Handoff({ exchange }: { exchange: Exchange }) {
+  const call = exchange.tools.find((t) => toolLabel(t.tool) === "delegate_task");
+  if (!call) return null;
+
+  const running = call.status === "running";
+  const seconds =
+    call.endedAt && !running ? `${((call.endedAt - call.startedAt) / 1000).toFixed(1)}s` : null;
+
+  return (
+    <div className={`handoff${running ? " handoff--running" : ""}`}>
+      <span className="handoff__from">Researcher</span>
+      <span className="handoff__arrow" aria-hidden="true">
+        →
+      </span>
+      <span className="handoff__to">Writer agent</span>
+      <span className="handoff__state">
+        {running ? "drafting the memo…" : `memo returned${seconds ? ` · ${seconds}` : ""}`}
+      </span>
+    </div>
   );
 }
 

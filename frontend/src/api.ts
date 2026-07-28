@@ -150,6 +150,18 @@ function handleFrame(frame: string, handlers: StreamHandlers): void {
     return;
   }
 
+  // The gateway reports upstream failures (quota exhausted, provider outage, auth)
+  // as an `error` object on an otherwise-normal chunk. Without this the stream just
+  // ends silently and the UI spins forever — the worst way to fail in front of an audience.
+  if (payload?.error) {
+    const message =
+      typeof payload.error === "string"
+        ? payload.error
+        : (payload.error.message ?? "The model provider returned an error.");
+    handlers.onError(message);
+    return;
+  }
+
   const delta = payload?.choices?.[0]?.delta?.content;
   if (typeof delta === "string" && delta.length > 0) handlers.onDelta(delta);
 }

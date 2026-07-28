@@ -51,10 +51,26 @@ def _deep_merge(base: dict, overlay: dict) -> dict:
     return result
 
 
-def _sync_profile() -> None:
+def _researcher_soul(mode: str) -> str:
+    """The Researcher's identity for this mode, with the Writer's persona substituted in.
+
+    Hermes reads exactly one file — $HERMES_HOME/SOUL.md. The `.handoff` variant and
+    the Writer's PERSONA.md are this repo's own layout: kept separate so the Writer can
+    be tuned without touching the Researcher, then merged here into the single file
+    Hermes actually loads.
+    """
+    agents = REPO_ROOT / "agents"
+    soul = (agents / "researcher" / ("SOUL.handoff.md" if mode == "handoff" else "SOUL.md")).read_text()
+    if mode == "handoff":
+        persona = (agents / "writer" / "PERSONA.md").read_text().strip()
+        soul = soul.replace("__WRITER_PERSONA__", persona)
+    return soul
+
+
+def _sync_profile(mode: str = "single") -> None:
     """Merge this repo's config overlay + the selected model overlay into the live profile's
     own config.yaml (never overwritten wholesale — Hermes's own defaults for compression,
-    memory, delegation, etc. are preserved), and copy SOUL.md in."""
+    memory, delegation, etc. are preserved), and write the mode's SOUL.md in."""
     profile_config_path = PROFILE_HOME / "config.yaml"
     live_config = yaml.safe_load(profile_config_path.read_text()) if profile_config_path.exists() else {}
     live_config = live_config or {}
@@ -67,31 +83,32 @@ def _sync_profile() -> None:
     model_overlay = yaml.safe_load(CONFIG.read_text())
 
     merged = _deep_merge(live_config, project_overlay)
+    if mode == "handoff":
+        handoff_overlay = yaml.safe_load(
+            (REPO_ROOT / "agents" / "researcher" / "config.handoff.yaml").read_text()
+        )
+        merged = _deep_merge(merged, handoff_overlay)
     merged = _deep_merge(merged, model_overlay)
 
     profile_config_path.write_text(yaml.safe_dump(merged, sort_keys=False))
-
-    shutil.copyfile(
-        REPO_ROOT / "agents" / "researcher" / "SOUL.md",
-        PROFILE_HOME / "SOUL.md",
-    )
+    (PROFILE_HOME / "SOUL.md").write_text(_researcher_soul(mode))
 
 
 def run_single() -> None:
     """Part 1 — the Researcher, one agent with two real tools, driven interactively."""
-    _sync_profile()
+    _sync_profile("single")
     print(f"[hermes-exercise] profile synced — launching hermes -p {PROFILE_NAME}")
     subprocess.run(["hermes", "-p", PROFILE_NAME], check=False)
 
 
 def run_handoff() -> None:
-    """Part 2 — Researcher (orchestrator) delegates to Writer (leaf) via Hermes delegate_task, with
-    long-term memory (memory_enabled + user_profile_enabled) so context carries across turns.
-
-    TODO: wire the two agents + the delegation handoff. See HANDOFF.md section 4. Not part of
-    this plan (Part 1 only).
-    """
-    raise NotImplementedError("Part 2 (handoff) not built yet — see HANDOFF.md.")
+    """Part 2 — the Researcher gathers facts, then delegates the memo to a Writer subagent
+    via Hermes's native delegate_task, with memory and session_search enabled so findings
+    carry across sessions."""
+    _sync_profile("handoff")
+    print(f"[hermes-exercise] profile synced (handoff: delegation + memory) — "
+          f"launching hermes -p {PROFILE_NAME}")
+    subprocess.run(["hermes", "-p", PROFILE_NAME], check=False)
 
 
 def main() -> None:

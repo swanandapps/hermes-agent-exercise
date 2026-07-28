@@ -1,0 +1,15 @@
+# Overlay merged into the hermes-exercise profile's own config.yaml by run.py.
+# Only the keys this project adds — Hermes's own defaults for everything else are untouched.
+mcp_servers:
+  trade-compliance:
+    command: "__PYTHON_EXECUTABLE__"
+    args:
+      - "-m"
+      - "tools.trade_mcp.server"
+    env:
+      PYTHONPATH: "__REPO_ROOT__"
+    enabled: true
+
+platform_toolsets:
+  cli:
+    - mcp-trade-compliance

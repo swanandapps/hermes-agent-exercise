@@ -9,7 +9,7 @@ import os
 
 import httpx
 
-TRADE_GOV_SEARCH_URL = "https://api.trade.gov/consolidated_screening_list/search"
+TRADE_GOV_SEARCH_URL = "https://data.trade.gov/consolidated_screening_list/v1/search"
 
 
 def fetch_screen_party(name: str) -> dict:
@@ -38,9 +38,9 @@ def fetch_screen_party(name: str) -> dict:
 
     hits = [
         {
-            "name": r.get("name", ""),
-            "source_list": r.get("source", ""),
-            "entity_type": r.get("type", ""),
+            "name": r.get("name") or "",
+            "source_list": r.get("source") or "",
+            "entity_type": r.get("type") or "",
         }
         for r in results
     ]

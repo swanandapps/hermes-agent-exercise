@@ -368,3 +368,36 @@ sanctions-screening agent.
 The general lesson: before optimising what a system does, check what it is doing that you never
 asked for. A config key that silently doesn't apply is worth more than every prompt-trimming
 trick combined.
+
+## Final cost picture
+
+With the gateway correctly scoped, measured per model call (`"say ok"`, no tools, no history):
+
+| Configuration | Tokens per call | What it buys |
+|---|---|---|
+| **Part 1 — single mode**, 1 toolset | **2,329** | Hermes runtime + SOUL.md + the two research tools |
+| **Part 2 — handoff mode**, 4 toolsets | **6,932** | the above + delegation, memory, session_search |
+| Difference | **4,603** | almost entirely `delegate_task`'s schema, which is large because it documents roles, parallel batch mode, background execution and depth limits |
+
+End to end, measured on real handoff turns: **14,400 – 22,700 tokens to answer one question**,
+against 54,600 – 80,111 before the platform fix.
+
+**Part 1 is essentially at the floor.** 2,329 tokens is Hermes's own instructions plus our SOUL
+plus two tool schemas — there is nothing meaningful left to remove without deleting features.
+
+**Part 2's extra 4,603 is the price of the multi-agent capability**, not waste. `delegate_task`
+carries a long schema because it is a genuinely complex tool. You can decline to pay it by not
+delegating; you cannot pay less and still delegate.
+
+### What is genuinely left
+
+- **Drop `session_search`** (~1.5 K/call) if MEMORY.md alone is enough. It is not: the
+  cross-session recall demo works *because* the agent searches past transcripts for facts that
+  were never written to MEMORY.md.
+- **Fewer model calls.** Still the highest-leverage lever, and still the one that keeps breaking
+  the workflow when forced with prompt instructions. Fixing the argument bugs earlier — country
+  aliases, `hs_code` typing — removed two failed calls from the same query, which is the version
+  of this that actually worked: fix the cause, don't instruct around it.
+
+The honest summary: after the platform fix, this is a normally-priced agent. The remaining spend
+is delegation, and delegation is the product.

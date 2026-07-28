@@ -14,3 +14,4 @@ mcp_servers:
 platform_toolsets:
   cli:
     - trade-compliance
+

@@ -196,12 +196,41 @@ floor of Hermes's own core tool schemas and scaffolding.
    you give up delegation or memory.
 4. **Trim tool results** — ~161 tokens across the whole turn. Not worth touching.
 
+### Delegation on Qwen3-32B is a coin flip
+
+Before trusting any of the causal claims below, the baseline had to be measured. Eight runs of
+the identical query against the identical config:
+
+**`delegate_task` fired in 4 of 8 runs.**
+
+When it fires, the memo is correct. When it does not, the model emits `delegate_task(goal="…")`
+as text — the same failure mode as Llama-3.1-8B, just intermittently rather than always. So the
+capability ladder is not hosted-works / open-fails. It is:
+
+| Model | Nested delegation |
+|---|---|
+| `gpt-5-mini` | reliable |
+| `qwen/qwen3-32b` | **~50%** |
+| `meta-llama/llama-3.1-8b` | never |
+
+Qwen sits exactly on the boundary. **This is the single most important number on this page for
+anyone planning to run a multi-agent workflow on open weights** — a 50% success rate on the
+step that defines the product is not a working system, and a single successful demo run would
+have hidden it completely.
+
+It also means the failure analyses below were over-attributed. With a 50% baseline, one failed
+run proves nothing. Only `tool_search` produced a distinct, repeatable error signature; the
+skills and batching conclusions are downgraded to "not demonstrated".
+
 ### The skills/delegation trade-off
 
-Disabling the 17 bundled skills is the largest single saving available, and it **breaks the
-handoff on Qwen3-32B**. With skills removed, Qwen stopped emitting `delegate_task` as a
-structured tool call and started emitting it as text — the exact failure mode Llama-3.1-8B
-showed:
+Disabling the 17 bundled skills is the largest single saving available (5,163 per call). With
+skills removed, Qwen failed to delegate — but given the 50% baseline above, **one failed run is
+not evidence**. Treat this as unproven rather than established; it would need ~10 runs each way
+to separate from noise, which was not worth the API spend here. Skills are left enabled because
+the saving is not worth the risk on a model that is already marginal at this step.
+
+The observed failure looked like this — the same shape as Llama-3.1-8B:
 
 ```
 delegate_task(
@@ -239,3 +268,55 @@ the wrong one.
 **Delegation is not free either.** The Writer is a full agent with its own system prompt, so a
 handoff pays that prefix again inside the child. It buys context isolation and an independent
 reasoning budget — worth it here, but it is a real cost, not a formatting step.
+
+## So what is the floor, and what did we actually fix?
+
+**Measured floor for this agent on Hermes: ~21,000 prompt tokens per model call**, and a handoff
+turn makes four to five calls — 55,000–80,000 tokens to answer one question.
+
+Where it goes, per call:
+
+| | Tokens |
+|---|---|
+| Hermes core scaffolding + 49 always-on tool schemas | ~14,700 |
+| Bundled skills | ~5,200 |
+| Handoff toolsets (delegation, memory, session_search) | ~1,500 |
+| **Fixed cost per call** | **~21,400** |
+| Everything the conversation actually contains | ~1,500 **per turn** |
+
+Hermes loads all 49 core tools — browser automation, kanban, Home Assistant, terminal, image
+generation — regardless of `platform_toolsets`. This agent uses five of them.
+
+A purpose-built agent for this job needs a ~600-token identity, two tool schemas, and two or
+three calls: **roughly 2,000–5,000 tokens per turn**. Hermes is therefore **10–20× heavier in
+tokens** for this workload.
+
+That is the honest shape of the trade-off, and it belongs in the LangChain comparison: Hermes
+gives you delegation, memory, sessions, MCP and a gateway without writing any of it, and charges
+~21 K tokens per model call for the privilege. Assembling only what you need is cheaper per call
+and costs you the runtime.
+
+### What we actually fixed
+
+1. **`max_tokens` 65,536 → 16,384.** Not a saving — an unblocking. OpenRouter was refusing
+   requests outright on reserved credit.
+2. **Provider configs are now replaced, not merged.** Switching to OpenRouter had silently kept
+   OpenAI's `base_url`.
+3. **Country aliases and `hs_code` typing.** Cut the same query from four tool calls to two,
+   which is a whole model call saved — worth more than any payload trimming.
+
+### What we tried and backed out
+
+| Attempt | Apparent saving | Why it was rejected |
+|---|---|---|
+| Disable bundled skills | 24% per call | Delegation failed after — unproven against a 50% baseline, not worth the risk |
+| Instruct the agent to batch lookups | 40% per turn | Skipped delegation and memory entirely |
+| `tool_search` deferred tool loading | 19% per call | Deferred the MCP tools too; the model was told to "use tool_search to find tools you can call", gave up, and answered from memory |
+
+### A trap in our own overlay design
+
+Removing `tool_search` from the repo overlay did not remove it from the live profile. `run.py`
+**merges** overlays onto the profile's existing config, so deleting a key upstream leaves it in
+place downstream — the same class of bug as the `base_url` leak, and it cost an hour of
+misdiagnosis because the running agent no longer matched the repo. Deleting a setting means
+deleting it from the profile config too.

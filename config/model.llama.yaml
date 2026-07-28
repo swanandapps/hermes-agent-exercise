@@ -13,3 +13,4 @@ model:
   default: meta-llama/llama-3.1-8b-instruct
   key_env: OPENROUTER_API_KEY
   context_length: 131072
+  max_tokens: 4096   # cap the per-call output reservation (see model.openrouter.yaml)

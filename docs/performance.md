@@ -108,3 +108,55 @@ OpenRouter model at OpenAI's endpoint. Overlays were being deep-merged key-by-ke
 config is atomic. `run.py` now replaces the `model:` block outright. Worth stating plainly,
 because "swapping models is just config" is exactly the kind of claim that hides this class of
 bug.
+
+## Token cost: where it actually goes
+
+Measured on this profile, `"say ok"` (no tools, no conversation) — i.e. the fixed cost paid
+before the user's question is even considered:
+
+| Configuration | Prompt tokens |
+|---|---|
+| Default profile (17 bundled skills) | **21,373** |
+| Bundled skills disabled | **16,210** |
+| Saving | **5,163 (24%)** |
+
+`hermes profile create` seeds 17 skill directories — apple, smart-home, social-media, yuanbao,
+media, github and so on. None relate to trade compliance, and all of them cost prompt budget on
+every call. Disabling them is a marker file in the profile root:
+
+```bash
+touch ~/.hermes/profiles/hermes-exercise/.no-bundled-skills
+rm -rf ~/.hermes/profiles/hermes-exercise/skills
+```
+
+Without it, Hermes re-seeds the directory on every startup — moving it aside is not enough.
+
+**The saving multiplies.** An agentic turn is not one model call: research, then delegate, then
+relay is five or more, and the full system prompt is re-sent on each. A complete handoff turn
+measured **81,927 total tokens**. Cutting 5K off the fixed prefix removes ~25K from a turn.
+
+### The `max_tokens` trap
+
+Hermes requests **65,536 output tokens per call** by default (`plugins/model-providers/custom`:
+`default_max_tokens=65536`). OpenRouter reserves credit against that ceiling, so requests get
+refused outright:
+
+```
+HTTP 402: You requested up to 65536 tokens, but can only afford 48357
+```
+
+— while the answer it would have produced costs a fraction of a cent. A compliance memo is
+~1,500 tokens. The overlays now set `max_tokens: 4096`, which is generous headroom and stops the
+over-reservation. This does not reduce tokens *used*; it stops the provider blocking requests
+against tokens that were never going to be consumed.
+
+### Remaining levers, not yet applied
+
+- **Trim tool results.** `screen_party` returns all nine Rosneft matches with full fields, and
+  every one is re-sent on each subsequent model call in the turn. Collapsing to the three unique
+  source lists would cut the largest repeated payload.
+- **Fewer toolsets.** Handoff mode adds `delegation`, `memory` and `session_search`; each tool
+  schema is prompt budget on every call. Single mode is meaningfully cheaper.
+- **Delegation is not free.** The Writer is a full agent with its own system prompt, so the
+  handoff pays that prefix a second time. It buys context isolation and an independent reasoning
+  budget — worth it here, but it is a real cost, not a formatting step.

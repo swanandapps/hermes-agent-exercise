@@ -30,8 +30,10 @@ data" honestly instead of fabricating a plausible-sounding answer.
 - **Model provider swap (`MODEL=openrouter`/`ollama`)** — Part 3. Part 1 runs OpenAI only.
 - **Policy/regulation-lookup Skill** — stretch item, only if Day 1 finishes early. Not required
   for a complete, defensible Part 1.
-- **Any UI beyond the terminal** — terminal-first is the deliberate choice; revisit only if all
-  three parts are solid with time to spare.
+- **Any UI beyond the terminal** — terminal-first is the deliberate choice. A basic front end is
+  planned as a deliberate **final phase across all three parts** (Part 1, 2, and 3 each get
+  terminal-verified first; the UI is attached last, once all three work end-to-end on terminal).
+  Not started until explicitly requested.
 
 ## Architecture
 

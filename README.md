@@ -1,67 +1,114 @@
-# Hermes Agent Exercise
+# Hermes Agent Exercise — Trade Compliance Researcher
 
-> **PST.AG — Senior AI Engineer (Hermes Agent) — final-round exercise.**
-> One project, built in layers, demonstrating all three required capabilities on the real
-> **Nous Research Hermes** runtime. See [`HANDOFF.md`](./HANDOFF.md) for the full brief.
+> Built on the real **Nous Research Hermes** agent runtime (open source, MIT) — not a
+> from-scratch agent loop and not LangChain.
 
 A **single tool-using agent** that scales into a **2-agent collaborative workflow**, and runs on
-**hosted or open-weight models** with a one-line config change — *not* a rewrite. That last point is
-the core Hermes strength (and the sharpest contrast with LangChain).
+**hosted or open-weight models with a one-line config change** — *not* a rewrite. That last point
+is the core Hermes strength (and the sharpest contrast with LangChain).
 
-> ⚠️ **Status: WIP scaffold.** The structure, run seam, and model overlays are in place; the agents,
-> tools, and delegation are still to be built (grep `TODO`). This README is the map.
+## Status
 
----
+| Part | Requirement | Status | How to run |
+|------|-------------|--------|------------|
+| **1** | Single tool-using agent | ✅ **Done** — tag `v1-single` | `python run.py --mode single` |
+| **2** | Researcher → Writer handoff + long-term memory | 🚧 next | `python run.py --mode handoff` |
+| **3** | Open-weight models, no Anthropic | 🚧 planned | `MODEL=ollama docker compose up` |
+| — | Hermes vs LangChain comparison (presented live) | ✅ **Done** | [`docs/hermes-vs-langchain.md`](docs/hermes-vs-langchain.md) |
 
-## What it does (maps 1:1 to the exercise)
+## What it does
 
-| Part | Requirement | How to run / demo |
-|------|-------------|-------------------|
-| **1 — Fundamentals** | Single tool-using agent | `python run.py --mode single` |
-| **2 — Multi-agent** | Researcher → Writer handoff + long-term memory | `python run.py --mode handoff` |
-| **3 — Open-weight** | Same agents, no Anthropic, via Ollama + a cloud endpoint | `MODEL=ollama docker compose up` (or `MODEL=openrouter`) |
-| — | Hermes vs LangChain comparison (presented live) | [`docs/hermes-vs-langchain.md`](./docs/hermes-vs-langchain.md) |
+A **trade-compliance due-diligence assistant**. Before signing with an international counterparty,
+an analyst has to answer two questions: *are we allowed to trade with this party*, and *does this
+shipment size make sense for this trade lane*. The Researcher answers both from **real data**,
+never from model memory.
 
-The Part-1 agent (the **Researcher**) becomes one half of Part 2; Part 3 changes only the model
-config. Each part stays independently runnable so every requirement is demoable on its own.
+| Tool | Data source | Returns |
+|------|-------------|---------|
+| `screen_party` | [trade.gov Consolidated Screening List](https://data.trade.gov) — 11 combined US restricted-party lists (OFAC SDN, BIS Entity List, BIS Denied Persons, State Dept debarred parties, …) | match / no-match, and which lists matched |
+| `trade_data_lookup` | [UN Comtrade](https://comtradeapi.un.org) | real export value for a country pair, HS chapter, and year |
 
-## The model swap = Part 3 in one line
+Verified live, end to end:
 
-Provider is chosen by the `MODEL` env var, which selects an overlay in [`config/`](./config):
+```
+> Is Rosneft on any US restricted-party list?
+Hit found — Rosneft appears on multiple U.S. restricted-party lists.
+  · Specially Designated Nationals (SDN) — U.S. Treasury (OFAC)
+  · Sectoral Sanctions Identifications (SSI) — U.S. Treasury (OFAC)
+  · Entity List (EL) — Bureau of Industry and Security (BIS)
 
-```bash
-MODEL=openai     python run.py --mode handoff   # hosted (dev)
-MODEL=openrouter python run.py --mode handoff   # open-weight via cloud endpoint
-MODEL=ollama     python run.py --mode handoff   # open-weight, self-hosted (local)
+> How much steel did Germany export to India in 2022?
+USD 437,432,476 of iron & steel (HS chapter 72), country-level aggregate. Source: UN Comtrade.
+
+> How much steel did Germany export to India in 2099?
+No data available. (Reported honestly — not fabricated.)
 ```
 
-No agent/tool code changes between them — that's the point.
+Every tool failure mode — no match, no data, unrecognised country, API error — returns an
+**explicit** result. The agent is instructed never to fill a gap with a plausible-sounding guess,
+which matters more in compliance than almost anywhere else.
 
 ## Setup
 
 ```bash
-cp .env.example .env          # add your keys; pick MODEL
+cp .env.example .env          # add your keys
 python -m venv .venv && . .venv/bin/activate
-pip install -r requirements.txt   # TODO: pin deps
+pip install -r requirements.txt
+
+hermes profile create hermes-exercise \
+  --description "PST.AG exercise: trade compliance Researcher/Writer agents"
+
+export $(grep -v '^#' .env | grep -v '^$' | xargs)
+python run.py --mode single
 ```
 
-For local open-weight (Part 3): `ollama pull qwen2.5:3b` (small model — see the 8 GB-laptop note in HANDOFF §2).
+Keys needed: `OPENAI_API_KEY`, and a free `TRADE_GOV_API_KEY` from
+[developer.trade.gov](https://developer.trade.gov).
+
+`run.py` merges this repo's config overlay and the selected model overlay into the Hermes
+profile, then launches an interactive session — Hermes's own defaults are preserved, not
+overwritten.
+
+## The model swap = Part 3 in one line
+
+Provider is chosen by the `MODEL` env var, which selects an overlay in [`config/`](config):
+
+```bash
+MODEL=openai     python run.py --mode single   # hosted
+MODEL=openrouter python run.py --mode single   # open-weight via cloud endpoint
+MODEL=ollama     python run.py --mode single   # open-weight, local
+```
+
+No agent or tool code changes between them — that's the point.
 
 ## Layout
 
 ```
-run.py                     # entrypoint: --mode single | handoff ; reads MODEL env
-config/
-  model.openai.yaml        # hosted overlay   (provider: custom — NOT "openai")
-  model.openrouter.yaml    # open-weight, cloud endpoint
-  model.ollama.yaml        # open-weight, local (small model)
-agents/                    # Hermes agent definitions (Researcher, Writer) — TODO
-tools/                     # tool definitions (MCP server) — TODO
-docs/hermes-vs-langchain.md# the 1-page comparison (live-presented)
-docker-compose.yml         # Part 3: app + Ollama, no Anthropic
-HANDOFF.md                 # full brief / cold-start context
+run.py                      # entrypoint: --mode single | handoff ; reads MODEL env
+agents/researcher/
+  SOUL.md                   # agent identity — tools-first, never guess
+  config.yaml               # MCP server registration + toolset exposure (overlay)
+tools/trade_mcp/
+  logic.py                  # the two tools' real work: HTTP + response normalisation
+  server.py                 # stdio MCP server — docstrings are what route the model
+  countries.json            # country name → UN M49 code lookup
+config/model.{openai,openrouter,ollama}.yaml   # Part-3 provider overlays
+docs/hermes-vs-langchain.md # the 1-page comparison
+docs/superpowers/           # design spec + implementation plan
 ```
 
-## Progression (for the live walk-through)
+**Lines of agent-loop code written: zero.** Hermes supplies the ReAct loop, tool dispatch, session
+persistence, memory, and delegation; this repo supplies identity, tools, and config. See the
+[comparison doc](docs/hermes-vs-langchain.md) for what the same system would look like in
+LangChain.
 
-Git tags tell the story: `v1-single` → `v2-handoff` → `v3-open-weight`. The final repo runs all modes.
+## Notes
+
+- Tools are exposed over **MCP** (stdio). A tool's **docstring is the routing signal** — what
+  teaches the model when to call it.
+- Hermes deliberately strips the parent environment when spawning MCP subprocesses
+  (`_build_safe_env`), so secrets need explicit `${VAR}` passthrough in the server's `env:` block.
+- `trade_data_lookup` is country-level aggregate data only — company-level questions belong to
+  `screen_party`. Recent years are often unpublished; "no data" is the correct answer, not an error.
+
+Git tags tell the progression: `v1-single` → `v2-handoff` → `v3-open-weight`.

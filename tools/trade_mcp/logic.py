@@ -98,6 +98,9 @@ def fetch_trade_data(reporter_country: str, partner_country: str, hs_code: str, 
     """Look up real import/export value between two countries for one HS product chapter and
     year, from UN Comtrade. Returns a single clean total — never the raw ~20-row response with
     its duplicate/estimate-flag noise."""
+    # Models reasonably pass HS chapters as numbers (72) as often as strings ("72"),
+    # and a chapter is two digits — "8" means chapter 08.
+    hs_code = str(hs_code).strip().zfill(2)
     reporter_code = _country_code(reporter_country)
     if reporter_code is None:
         return {"error": f"unrecognized country: {reporter_country}"}

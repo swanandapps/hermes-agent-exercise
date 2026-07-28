@@ -27,7 +27,9 @@ def screen_party(name: str) -> dict:
 
 
 @mcp.tool()
-def trade_data_lookup(reporter_country: str, partner_country: str, hs_code: str, year: int) -> dict:
+def trade_data_lookup(
+    reporter_country: str, partner_country: str, hs_code: str | int, year: int
+) -> dict:
     """Look up real total import/export value between two countries for one product category and
     year, from UN Comtrade — country-level aggregate data only, NOT company/shipment-level (use
     screen_party for company questions). hs_code is a 2-digit HS chapter, e.g. 72=iron/steel,

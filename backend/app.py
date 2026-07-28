@@ -95,6 +95,85 @@ def _error_event(message: str) -> bytes:
     return f"event: app.error\ndata: {json.dumps({'message': message})}\n\n".encode()
 
 
+def _unwrap_tool_result(raw: str) -> tuple[str, bool]:
+    """Pull the tool's own JSON out of Hermes's untrusted-content envelope.
+
+    Results arrive wrapped in an `<untrusted_tool_result>` guard block (Hermes's
+    prompt-injection defence) with the payload JSON-escaped inside a
+    `{"result": "..."}` envelope. Returns (readable payload, failed).
+    """
+    import json as _json
+    import re
+
+    match = re.search(r'\{"result":\s*"(.*?)"\}\s*(?:</untrusted_tool_result>|$)', raw, re.DOTALL)
+    if match:
+        try:
+            inner = _json.loads('"' + match.group(1) + '"')
+            parsed = _json.loads(inner)
+            return _json.dumps(parsed, indent=2), "error" in parsed
+        except (ValueError, TypeError):
+            pass
+    # Envelope changed or payload truncated — fall back to a text probe rather than
+    # silently reporting success.
+    return raw, ('\\"error\\"' in raw or '"error"' in raw)
+
+
+@app.get("/api/detail/{session_id}")
+async def turn_detail(session_id: str) -> dict:
+    """Tool arguments, tool results, and the model's reasoning for the latest turn.
+
+    The chat stream reports only which tools ran and when. The arguments they were
+    called with — and whether a call actually failed — live in the session history,
+    which is what makes a run diagnosable after the fact.
+    """
+    url = f"{GATEWAY_URL}/api/sessions/{session_id}/messages"
+    try:
+        async with httpx.AsyncClient(timeout=20.0) as client:
+            res = await client.get(url, headers={"Authorization": f"Bearer {GATEWAY_KEY}"})
+            res.raise_for_status()
+            messages = res.json().get("data", [])
+    except (httpx.HTTPError, ValueError):
+        return {"calls": [], "reasoning": ""}
+
+    # Walk back to the last user message — everything after it belongs to this turn.
+    start = 0
+    for i in range(len(messages) - 1, -1, -1):
+        if messages[i].get("role") == "user":
+            start = i
+            break
+    turn = messages[start:]
+
+    results: dict[str, str] = {}
+    for message in turn:
+        if message.get("role") == "tool" and message.get("tool_call_id"):
+            results[message["tool_call_id"]] = message.get("content") or ""
+
+    calls = []
+    reasoning_parts = []
+    for message in turn:
+        if message.get("role") != "assistant":
+            continue
+        reasoning = message.get("reasoning") or message.get("reasoning_content") or ""
+        if reasoning:
+            reasoning_parts.append(reasoning)
+        for call in message.get("tool_calls") or []:
+            fn = call.get("function", {})
+            payload, failed = _unwrap_tool_result(results.get(call.get("id", ""), ""))
+            calls.append(
+                {
+                    "id": call.get("id", ""),
+                    "name": fn.get("name", ""),
+                    "arguments": fn.get("arguments", ""),
+                    "result": payload[:700],
+                    # A tool that reports an error still succeeds at the transport
+                    # level, so failure has to be read out of the payload itself.
+                    "failed": failed,
+                }
+            )
+
+    return {"calls": calls, "reasoning": "\n\n".join(reasoning_parts)}
+
+
 # Serve the built frontend when it exists (production / Docker). In dev, Vite serves
 # the UI and proxies /api here instead.
 _DIST = REPO_ROOT / "frontend" / "dist"

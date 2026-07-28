@@ -23,6 +23,39 @@ export interface AppConfig {
   mode: string;
 }
 
+/** Post-turn detail: what each tool was actually called with, and what came back.
+ *  The live stream reports only tool names and timing. */
+export interface CallDetail {
+  id: string;
+  name: string;
+  arguments: string;
+  result: string;
+  failed: boolean;
+}
+
+export interface TurnDetail {
+  calls: CallDetail[];
+  reasoning: string;
+}
+
+export async function fetchDetail(sessionId: string): Promise<TurnDetail> {
+  const res = await fetch(`/api/detail/${encodeURIComponent(sessionId)}`);
+  if (!res.ok) return { calls: [], reasoning: "" };
+  return res.json();
+}
+
+/** `{"reporter_country":"Germany","hs_code":72}` → `reporter_country: Germany · hs_code: 72` */
+export function formatArgs(raw: string): string {
+  try {
+    const parsed = JSON.parse(raw);
+    return Object.entries(parsed)
+      .map(([key, value]) => `${key}: ${typeof value === "string" ? value : JSON.stringify(value)}`)
+      .join("  ·  ");
+  } catch {
+    return raw;
+  }
+}
+
 export interface StreamHandlers {
   onDelta(text: string): void;
   onTool(call: { tool: string; toolCallId: string; status: "running" | "completed" }): void;
@@ -121,10 +154,11 @@ export function verdictOf(text: string): Verdict | null {
   const firstLine = text.trim().split("\n")[0] ?? "";
   // The model sometimes labels its opening line ("Direct answer: Cleared — …"),
   // so look past that prefix, but nowhere further: a verdict word buried mid-answer
-  // is not a verdict.
-  const head = firstLine.replace(/^direct answer:\s*/i, "").trimStart().toLowerCase();
-  if (head.startsWith("hit found")) return "hit";
-  if (head.startsWith("cleared")) return "cleared";
-  if (head.startsWith("no data")) return "nodata";
+  // is not a verdict. It also varies the wording — "Hit", "Hit found", "Blocked" —
+  // so match on the leading word, anchored, rather than one exact phrase.
+  const head = firstLine.replace(/^direct answer:\s*/i, "").trimStart();
+  if (/^(hit|blocked|flagged)\b/i.test(head)) return "hit";
+  if (/^(cleared|clear|no match)\b/i.test(head)) return "cleared";
+  if (/^no data\b/i.test(head)) return "nodata";
   return null;
 }

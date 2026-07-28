@@ -1,11 +1,14 @@
 import { useEffect, useRef, useState } from "react";
 import {
   fetchConfig,
+  fetchDetail,
+  formatArgs,
   streamChat,
   toolLabel,
   verdictOf,
   type AppConfig,
   type ChatMessage,
+  type TurnDetail,
   type ToolCall,
   type Verdict,
 } from "./api";
@@ -14,6 +17,7 @@ interface Exchange {
   query: string;
   answer: string;
   tools: ToolCall[];
+  detail?: TurnDetail;
   error?: string;
   done: boolean;
   askedAt: Date;
@@ -25,10 +29,12 @@ const VERDICT_COPY: Record<Verdict, { label: string; channel: string }> = {
   nodata: { label: "No data", channel: "Unresolved" },
 };
 
+// The third names a specific entity on purpose: without one, the agent correctly
+// asks who the counterparty is instead of screening, which makes a poor demo.
 const EXAMPLES = [
   "Is Rosneft on any US restricted-party list?",
   "How much steel did Germany export to India in 2022?",
-  "We're shipping steel pipes to a buyer in Russia — any compliance risk, and is the volume normal?",
+  "We're signing a steel deal with Rosneft Trading S.A. Screen them, and check Germany's iron & steel exports to the Russian Federation in 2022.",
 ];
 
 export default function App() {
@@ -96,6 +102,11 @@ export default function App() {
     } finally {
       patch((e) => ({ ...e, done: true }));
       setBusy(false);
+      // Arguments, results and reasoning only exist in the session history —
+      // the live stream carries names and timing alone.
+      fetchDetail(sessionId.current)
+        .then((detail) => patch((e) => ({ ...e, detail })))
+        .catch(() => undefined);
     }
   }
 
@@ -211,26 +222,76 @@ function Finding({ exchange, index }: { exchange: Exchange; index: number }) {
           </div>
         )}
 
+        {exchange.detail?.reasoning && <Reasoning text={exchange.detail.reasoning} />}
+
         {exchange.tools.length > 0 && (
           <div className="sources">
             <p className="sources__label">Sources consulted</p>
             <ul>
-              {exchange.tools.map((tool) => (
-                <li key={tool.toolCallId} className={`source source--${tool.status}`}>
-                  <span className="source__name">{toolLabel(tool.tool)}</span>
-                  <span className="source__status">
-                    {tool.status === "running"
-                      ? "running…"
-                      : tool.endedAt
-                        ? `${((tool.endedAt - tool.startedAt) / 1000).toFixed(1)}s`
-                        : "done"}
-                  </span>
-                </li>
-              ))}
+              {exchange.tools.map((tool) => {
+                const detail = exchange.detail?.calls.find((c) => c.id === tool.toolCallId);
+                const failed = detail?.failed ?? false;
+                return (
+                  <li
+                    key={tool.toolCallId}
+                    className={`source source--${tool.status}${failed ? " source--failed" : ""}`}
+                  >
+                    <div className="source__head">
+                      <span className="source__name">{toolLabel(tool.tool)}</span>
+                      <span className="source__status">
+                        {tool.status === "running"
+                          ? "running…"
+                          : failed
+                            ? "rejected"
+                            : tool.endedAt
+                              ? `${((tool.endedAt - tool.startedAt) / 1000).toFixed(1)}s`
+                              : "done"}
+                      </span>
+                    </div>
+                    {detail && (
+                      <p className="source__args">{formatArgs(detail.arguments)}</p>
+                    )}
+                    {detail && failed && (
+                      <p className="source__result">{firstError(detail.result)}</p>
+                    )}
+                  </li>
+                );
+              })}
             </ul>
           </div>
         )}
       </div>
     </article>
+  );
+}
+
+/** Pull the error message out of a tool's JSON payload for a one-line summary. */
+function firstError(result: string): string {
+  try {
+    const parsed = JSON.parse(result);
+    if (typeof parsed?.error === "string") return parsed.error;
+  } catch {
+    /* fall through to the raw text */
+  }
+  return result.slice(0, 140);
+}
+
+function Reasoning({ text }: { text: string }) {
+  const [open, setOpen] = useState(false);
+  return (
+    <div className="reasoning">
+      <button
+        type="button"
+        className="reasoning__toggle"
+        onClick={() => setOpen((v) => !v)}
+        aria-expanded={open}
+      >
+        <span className="reasoning__chevron" aria-hidden="true">
+          {open ? "−" : "+"}
+        </span>
+        Reasoning
+      </button>
+      {open && <pre className="reasoning__text">{text}</pre>}
+    </div>
   );
 }

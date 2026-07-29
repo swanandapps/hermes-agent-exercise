@@ -171,35 +171,55 @@ function handleFrame(frame: string, handlers: StreamHandlers): void {
  *  showing the wrong one in a compliance tool is worse than showing none. */
 export type Verdict = "hit" | "review" | "cleared" | "nodata";
 
+const VERDICT_HEAD =
+  /^(hit|review|cleared|clear|no data|insufficient data|blocked|flagged|do not proceed|proceed|possible match|inconclusive|no match)\b/i;
+
+/** Leading markdown, quote and heading decoration. Formatting is not meaning. */
+const undecorate = (line: string) => line.replace(/^[\s>#*_`-]+/, "").trimStart();
+
+/**
+ * The verdict-bearing opening of one line, or null.
+ *
+ * SOUL.md asks for the verdict word first with nothing before it, and the model mostly
+ * complies — but not always, and dropping the chip whenever it slips is the wrong trade,
+ * since the chip is the one thing this page exists to show. So try the bare line, then peel
+ * exactly one leading label:
+ *
+ *   "**REVIEW** — partial matches"           bare, just bolded
+ *   "Direct answer: CLEARED — none"          a labelled opening
+ *   "**Screening: HIT** — matched three"     the same label, inside bold
+ *   "**Rosneft Trading S.A.** — **HIT**"     the party named before the verdict
+ *
+ * One peel only, each pattern short and anchored, so prose that merely mentions a verdict
+ * ("this is not a HIT under any reading") still yields nothing. Order matters: peeling before
+ * testing the bare line would eat the verdict out of "**REVIEW** — ...".
+ */
+function verdictHead(line: string): string | null {
+  const candidates = [
+    line,
+    line.replace(/^[\s>#*_`-]*[A-Za-z][A-Za-z ]{0,24}:\s*/, ""),
+    line.replace(/^[^\n\u2014\u2013-]{1,60}\s+[\u2014\u2013-]\s*/, ""),
+  ];
+  return candidates.map(undecorate).find((c) => VERDICT_HEAD.test(c)) ?? null;
+}
+
 export function verdictOf(text: string): Verdict | null {
-  // Scan the first few non-empty lines, not just the first. The model often heads its
-  // answer ("## Screening Result") and puts the verdict on the next line — the verdict is
-  // still at the top, and dropping the chip there loses the one thing the page is for.
-  // Deliberately shallow: a verdict word further down is prose, not a verdict.
-  const firstLine =
-    text
-      .trim()
-      .split("\n")
-      .map((l) => l.trim())
-      .filter(Boolean)
-      .slice(0, 3)
-      .find((l) => /^[\s>#*_`-]*(hit|review|cleared|clear|no data|insufficient data|blocked|flagged|do not proceed|proceed|possible match|inconclusive|no match)\b/i.test(l)) ??
-    (text.trim().split("\n")[0] ?? "");
-  // The model sometimes labels its opening line ("Direct answer: Cleared — …"),
-  // so look past that prefix, but nowhere further: a verdict word buried mid-answer
-  // is not a verdict. It also varies the wording — "Hit", "Hit found", "Blocked" —
-  // so match on the leading word, anchored, rather than one exact phrase.
-  // Strip leading markdown before matching. The model very often bolds its verdict
-  // ("**REVIEW** — …") or heads the memo ("### CLEARED"), and an anchored match against the
-  // raw line then fails, so a correct answer renders with no chip at all. Formatting is not
-  // meaning; take it off before deciding.
-  const head = firstLine
-    .replace(/^direct answer:\s*/i, "")
-    .replace(/^[\s>#*_`-]+/, "")
-    .trimStart();
-  // opens with a deal-desk decision instead. Both vocabularies map to the same channels.
+  // Scan the first few non-empty lines rather than only the first: the model often heads its
+  // answer ("## Screening Result") and puts the verdict underneath. Deliberately shallow —
+  // a verdict word further down is prose, not a verdict.
+  const head = text
+    .trim()
+    .split("\n")
+    .map((l) => l.trim())
+    .filter(Boolean)
+    .slice(0, 3)
+    .map(verdictHead)
+    .find(Boolean);
+  if (!head) return null;
+
   // REVIEW before HIT: screening is fuzzy, so most result sets are near-misses rather than
-  // matches, and colouring those red is how a red banner stops meaning anything.
+  // matches, and colouring those red is how a red banner stops meaning anything. The Writer's
+  // memo opens with a deal-desk decision instead of a screening verdict; both map here.
   if (/^(review|possible match|inconclusive)\b/i.test(head)) return "review";
   if (/^(hit|blocked|flagged|do not proceed)\b/i.test(head)) return "hit";
   if (/^(cleared|clear|no match|proceed)\b/i.test(head)) return "cleared";

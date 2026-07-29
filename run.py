@@ -22,13 +22,21 @@ MODEL = os.environ.get("MODEL", "openai")          # openai | openrouter | ollam
 REPO_ROOT = Path(__file__).parent
 CONFIG = REPO_ROOT / "config" / f"model.{MODEL}.yaml"
 PROFILE_NAME = "hermes-exercise"
-PROFILE_HOME = Path.home() / ".hermes" / "profiles" / PROFILE_NAME
+# In a container there are no other profiles to coexist with, so Hermes's own
+# HERMES_HOME is the profile directory and there is nothing to create or name.
+# Locally we keep a named profile so this exercise stays isolated from the other
+# Hermes profiles on the machine.
+PROFILE_HOME = Path(
+    os.environ.get("HERMES_HOME") or Path.home() / ".hermes" / "profiles" / PROFILE_NAME
+)
 
 
 def _preflight() -> None:
     if not CONFIG.exists():
-        sys.exit(f"Unknown MODEL='{MODEL}'. Expected one of: openai, openrouter, ollama "
-                 f"(no overlay at {CONFIG}).")
+        overlays = sorted(p.stem.replace("model.", "") for p in (REPO_ROOT / "config").glob("model.*.yaml"))
+        sys.exit(f"Unknown MODEL='{MODEL}'. Available: {', '.join(overlays)} (no overlay at {CONFIG}).")
+    if os.environ.get("HERMES_HOME"):
+        PROFILE_HOME.mkdir(parents=True, exist_ok=True)   # container: we own this dir
     if not PROFILE_HOME.exists():
         sys.exit(
             f"Profile '{PROFILE_NAME}' does not exist yet. Create it first:\n"

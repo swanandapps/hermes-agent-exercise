@@ -1,0 +1,11 @@
+# Model overlay — SPEED-OPTIMISED open-weight. Selected by MODEL=fast.
+#
+# Same family as the qwen3-32b overlay, but a "flash" variant tuned for latency rather than
+# depth. The full agent runs 4-5 model calls per turn, so per-call speed compounds: this is the
+# single biggest lever on how long a live demo takes to answer.
+model:
+  provider: openrouter
+  default: qwen/qwen3.7-flash
+  key_env: OPENROUTER_API_KEY
+  context_length: 131072
+  max_tokens: 16384

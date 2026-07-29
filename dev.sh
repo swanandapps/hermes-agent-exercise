@@ -98,30 +98,6 @@ echo "starting  (mode=$MODE  model=$MODEL)"
 hermes -p hermes-exercise gateway run --replace > .logs/gateway.log 2>&1 &
 PIDS+=($!)
 wait_for "http://127.0.0.1:$GATEWAY_PORT/health" "gateway  :$GATEWAY_PORT" 90
-
-# /health only says the gateway is listening. If the MCP server fails to start, Hermes
-# retries three times, PARKS it, and then serves happily with no tools registered — the agent
-# answers from its own knowledge and nothing on screen says the tools were missing.
-#
-# Those retries back off 1s/2s/4s and all happen while the gateway is still coming up, so the
-# give-up line is already in the log by the time /health answers: measured at t+9s for both.
-# A short grace window is therefore enough. The first version of this waited 15s on every
-# start, because it only broke out of the loop on failure — so a healthy run paid the full
-# timeout to learn nothing. Poll briefly, then believe it.
-MCP_FAIL='failed initial connection after|no valid toolsets configured|failed to start'
-for _ in $(seq 1 5); do
-  if grep -qE "$MCP_FAIL" .logs/gateway.log 2>/dev/null; then
-    echo ""
-    echo "✗ The trade-compliance MCP server did not register — the agent has NO TOOLS."
-    echo "  It will still answer, from training knowledge, and look plausible."
-    echo ""
-    grep -E "$MCP_FAIL" .logs/gateway.log | tail -2 | sed 's/^/    /'
-    exit 1
-  fi
-  sleep 1
-done
-echo "  ✓ tools registered"
-
 # ── 2. the relay ─────────────────────────────────────────────────────────────
 uvicorn backend.app:app --port "$BACKEND_PORT" > .logs/backend.log 2>&1 &
 PIDS+=($!)
@@ -133,6 +109,29 @@ wait_for "http://127.0.0.1:$BACKEND_PORT/api/config" "backend  :$BACKEND_PORT" 3
 PIDS+=($!)
 # Vite binds localhost as IPv6 (::1) — a 127.0.0.1 probe would never succeed.
 wait_for "http://localhost:$UI_PORT" "UI       :$UI_PORT" 60
+
+# Only now check that the tools registered. /health says the gateway is listening, not that it
+# can do anything: if the MCP server fails to start, Hermes retries three times, PARKS it, and
+# then serves happily with nothing registered. The agent still answers — from its own knowledge
+# — and nothing on screen says the tools were missing. That is not a theoretical risk; it has
+# happened twice here, once from switching branches under a running gateway and once from a
+# missing package in the container.
+#
+# Deliberately last, and costing nothing. Hermes writes the give-up line while it is still
+# starting (measured: same second /health answers), so by the time the relay and the UI are up
+# the verdict has been in the log for several seconds. An earlier version slept 5s here to wait
+# for news that had already arrived — a safeguard is not worth paying latency for when the
+# information is free.
+MCP_FAIL='failed initial connection after|no valid toolsets configured|failed to start'
+if grep -qE "$MCP_FAIL" .logs/gateway.log 2>/dev/null; then
+  echo ""
+  echo "✗ The trade-compliance MCP server did not register — the agent has NO TOOLS."
+  echo "  It will still answer, from training knowledge, and look plausible."
+  echo ""
+  grep -E "$MCP_FAIL" .logs/gateway.log | tail -2 | sed 's/^/    /'
+  exit 1
+fi
+echo "  ✓ tools registered"
 
 echo ""
 echo "  →  http://localhost:$UI_PORT"

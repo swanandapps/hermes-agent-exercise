@@ -43,15 +43,14 @@ second agent and a model swap — which is exactly where the columns flip.
 
 ## Two things worth saying out loud
 
-**Neither framework's value is the loop.** The ReAct cycle is about fifteen lines and you can
-write it yourself. The value is the twenty things around it you only discover you need once real
-users arrive — retries, truncation, session storage, search over it, memory policy, delegation.
+**Neither framework's value is the loop.** The ReAct cycle is about fifteen lines. The value is
+everything around it you only discover you need once real users arrive — retries, truncation,
+session storage, search over it, memory policy, delegation.
 
-**A framework's defaults are the real cost.** Hermes ships 49 tools enabled by default, tuned for
-a general assistant. Scoping this agent to the five it actually uses cut the prompt from
-**21,373 to 6,694 tokens per call** — and tool-calling got *more* reliable, because a model
-choosing among five routes better than one choosing among 49. Knowing the loop is fifteen lines
-is precisely what makes 21,373 look wrong rather than inevitable.
+**A framework's defaults are the real cost.** Hermes enables 49 tools by default, tuned for a
+general assistant. Scoping this agent to the five it uses cut the prompt from **21,373 to 6,694
+tokens per call**, and tool-calling got *more* reliable — a model choosing among five routes
+better than one choosing among 49.
 
 ---
 
@@ -66,13 +65,11 @@ is precisely what makes 21,373 look wrong rather than inevitable.
 > **Neither** when you have two tools, one user and no memory requirement — that is the loop plus
 > your functions, and a framework will cost you more in defaults than it saves you in code.
 
-Both are MIT. Neither API is stable: LangChain has moved agent APIs twice in about a year
+Both are MIT, and neither API is stable: LangChain has moved agent APIs twice in about a year
 (`AgentExecutor` → `create_react_agent` → `create_agent`), and Hermes is pre-1.0 — building this
-found its published docs contradicting its own source in three places. **Pin your versions and
-read the source, in either camp.**
+found its docs contradicting its own source in three places. **Pin versions and read the source,
+in either camp.**
 
----
-
-*Full evidence — the fifteen-line loop written out, what a tool schema actually contains, the
-three routes into Hermes and why this repo took the third, measured token costs, and where
-open-weight models break — is in [`hermes-vs-langchain-detail.md`](hermes-vs-langchain-detail.md).*
+*Evidence — the loop written out, what a tool schema contains, the three routes into Hermes and
+why this repo took the third, and where open-weight models break — is in
+[`hermes-vs-langchain-detail.md`](hermes-vs-langchain-detail.md).*

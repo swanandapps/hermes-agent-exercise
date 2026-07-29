@@ -179,3 +179,75 @@ def fetch_trade_data(reporter_country: str, partner_country: str, hs_code: str, 
         "partner": partner_country,
         "product_hs_code": hs_code,
     }
+
+
+# ── company background ───────────────────────────────────────────────────────────────────────
+#
+# Answers "who is this counterparty" — sector, what they make, where they are based. It exists
+# because screening a name you cannot place is guesswork: an analyst handed "Acme Trading S.A."
+# needs to know it is a Rotterdam chemicals broker before deciding whether the deal even makes
+# sense.
+#
+# It is deliberately NOT a news or sanctions tool. The query is shaped toward profile pages, and
+# every result is returned tagged as unverified web text, because the difference between this and
+# screen_party is the difference between hearsay and the register itself. A page cannot put a
+# party on a list and cannot take one off. Blurring the two fails in both directions: an old
+# "faces sanctions probe" headline kills a legal deal, and a glowing corporate profile talks
+# someone past a real SDN listing.
+_DDGS_MAX_RESULTS = 4
+_DDGS_SNIPPET_CHARS = 400
+
+_BACKGROUND_DISCLAIMER = (
+    "Unverified web text, for context only. This is NOT a compliance finding and says nothing "
+    "about sanctions status — only screen_party does. Never let it change a screening verdict. "
+    "A search engine always returns its closest guess, so these results may describe a "
+    "different, similarly-named company: check each title and URL actually refers to the party "
+    "asked about, and say the background could not be confirmed if they do not."
+)
+
+
+def fetch_company_background(name: str) -> dict:
+    """Look up what a company is and does, from public web sources. Background, never a finding."""
+    try:
+        from ddgs import DDGS
+    except ImportError:
+        return {"error": "web search unavailable: the 'ddgs' package is not installed"}
+
+    # Steered toward "who are they" pages rather than headlines. Search engines happily return
+    # news for a bare company name, and news is the one thing this tool must not smuggle into a
+    # compliance conversation.
+    query = f'"{name}" company profile industry headquarters what the company does'
+
+    last_exc: Exception | None = None
+    for attempt in range(1, _MAX_ATTEMPTS + 1):
+        try:
+            raw = list(DDGS().text(query, max_results=_DDGS_MAX_RESULTS))
+            break
+        except Exception as exc:                      # ddgs raises its own rate-limit types
+            last_exc = exc
+            if attempt < _MAX_ATTEMPTS:
+                time.sleep(_RETRY_BACKOFF_SECONDS[attempt - 1])
+    else:
+        return {"error": f"web search error: {last_exc}"}
+
+    if not raw:
+        return {
+            "found": False,
+            "message": f"no public background found for '{name}'",
+            "evidence_type": "unverified_web",
+            "disclaimer": _BACKGROUND_DISCLAIMER,
+        }
+
+    return {
+        "found": True,
+        "evidence_type": "unverified_web",
+        "sources": [
+            {
+                "title": (r.get("title") or "").strip(),
+                "url": (r.get("href") or "").strip(),
+                "summary": (r.get("body") or "").strip()[:_DDGS_SNIPPET_CHARS],
+            }
+            for r in raw
+        ],
+        "disclaimer": _BACKGROUND_DISCLAIMER,
+    }

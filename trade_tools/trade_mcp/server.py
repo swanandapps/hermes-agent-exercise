@@ -49,5 +49,24 @@ def trade_data_lookup(
     )
 
 
+@mcp.tool()
+def company_background(name: str) -> dict:
+    """Find out what a company IS and DOES — its industry, products, headquarters, rough size —
+    when you have only a name and no idea who the counterparty is. Answers "who are these
+    people", nothing else.
+
+    NOT a compliance tool. It returns unverified web text and cannot establish sanctions status,
+    legal standing, ownership or any fact a memo relies on. Use `screen_party` for sanctions —
+    always — and never let anything from this tool change a screening verdict in either
+    direction. A web page cannot put a party on a restricted-party list and cannot take one off.
+    Do not use it to look for news, allegations or investigations about a party.
+
+    A search engine always returns its closest guess, so results may describe a different,
+    similarly-named company. Check each returned title and url actually refers to the party you
+    asked about; if they do not, say the background could not be confirmed rather than
+    describing the wrong company. Attribute anything you repeat from it to the source url."""
+    return logic.fetch_company_background(name=name)
+
+
 if __name__ == "__main__":
     mcp.run()

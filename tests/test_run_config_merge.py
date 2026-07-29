@@ -17,6 +17,6 @@ def test_deep_merge_overlay_wins_on_conflict():
 
 def test_deep_merge_list_values_replaced_not_merged():
     base = {"platform_toolsets": {"cli": ["memory"]}}
-    overlay = {"platform_toolsets": {"cli": ["memory", "mcp-trade-compliance"]}}
+    overlay = {"platform_toolsets": {"cli": ["memory", "trade-compliance"]}}
     result = _deep_merge(base, overlay)
-    assert result["platform_toolsets"]["cli"] == ["memory", "mcp-trade-compliance"]
+    assert result["platform_toolsets"]["cli"] == ["memory", "trade-compliance"]

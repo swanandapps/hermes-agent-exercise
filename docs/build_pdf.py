@@ -101,9 +101,9 @@ code {
 table {
   width: 100%;
   border-collapse: collapse;
-  margin: 0 0 3mm;
-  font-size: 8.4pt;
-  line-height: 1.38;
+  margin: 0 0 3.5mm;
+  font-size: 8.5pt;
+  line-height: 1.42;
   break-inside: auto;
 }
 
@@ -131,6 +131,10 @@ table:nth-of-type(1) th:first-child { width: 14%; }
 table:nth-of-type(1) th:nth-child(2), table:nth-of-type(1) th:nth-child(3) { width: 43%; }
 table:nth-of-type(2) th:first-child { width: 26%; }
 table:nth-of-type(2) th:nth-child(2), table:nth-of-type(2) th:nth-child(3) { width: 37%; }
+/* The job table's middle column holds one word — give it just enough not to wrap its heading. */
+table:nth-of-type(3) th:first-child { width: 33%; }
+table:nth-of-type(3) th:nth-child(2) { width: 13%; white-space: nowrap; }
+table:nth-of-type(3) th:nth-child(3) { width: 54%; }
 
 /* Hermes column tinted, so the eye tracks one framework down the page. */
 td:nth-child(2) { background: var(--hermes-bg); }
@@ -143,6 +147,12 @@ tr:has(td:first-child:empty) td { border-top: none; }
 tr:not(:has(td:first-child:empty)) td { border-bottom: none; }
 
 hr { display: none; }
+
+/* Break before "Which one for which job" so that table stays whole. Splitting a table across
+   a page is worse than a slightly shorter first page: the reader loses the column headings
+   mid-comparison, which is the one thing a comparison table cannot afford. Page one then
+   carries the framing and both required tables; page two carries the recommendation. */
+h2:nth-of-type(3) { break-before: page; margin-top: 0; }
 tr, h1, h2 { break-inside: avoid; }
 """
 

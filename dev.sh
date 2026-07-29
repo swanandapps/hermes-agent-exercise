@@ -29,6 +29,23 @@ export MODEL="${MODEL_OVERRIDE:-${MODEL:-fast}}"
 [[ -d .venv ]] || { echo "✗ No .venv — python -m venv .venv && pip install -r requirements.txt"; exit 1; }
 source .venv/bin/activate
 
+# The relay authenticates to the gateway with API_SERVER_KEY, which the gateway itself
+# generates and keeps in the PROFILE's .env — not this repo's. Read it from there so
+# there is one copy: a duplicate in ./.env rots the day the key is rotated, and the
+# failure it produces ("Illegal header value b'Bearer '") points at the network.
+PROFILE_ENV="${HERMES_HOME:-$HOME/.hermes/profiles/hermes-exercise}/.env"
+if [[ -z "${API_SERVER_KEY:-}" && -f "$PROFILE_ENV" ]]; then
+  # Sourced in a subshell rather than parsed: the file is shell syntax, so quoting is
+  # its problem, not ours.
+  export API_SERVER_KEY="$(set -a; . "$PROFILE_ENV"; printf '%s' "${API_SERVER_KEY:-}")"
+fi
+if [[ -z "${API_SERVER_KEY:-}" ]]; then
+  echo "✗ API_SERVER_KEY not found in $PROFILE_ENV"
+  echo "  The relay cannot authenticate to the gateway without it. Start the gateway"
+  echo "  once (hermes -p hermes-exercise gateway run) to have it generated."
+  exit 1
+fi
+
 # ── ports ────────────────────────────────────────────────────────────────────
 # A stale listener is worse than a missing one: the request succeeds, against the
 # wrong process, and nothing in the UI says so.

@@ -30,12 +30,15 @@ def screen_party(name: str) -> dict:
 def trade_data_lookup(
     reporter_country: str, partner_country: str, hs_code: str | int, year: int
 ) -> dict:
-    """Look up real total import/export value between two countries for one product category and
-    year, from UN Comtrade — country-level aggregate data only, NOT company/shipment-level (use
-    screen_party for company questions). hs_code is a 2-digit HS chapter, e.g. 72=iron/steel,
-    27=mineral fuels/crude oil, 85=electronics, 84=machinery, 10=cereals, 30=pharma. Recent/
-    current years are often not yet published — an explicit "no data available" is expected and
-    correct in that case, not an error to work around."""
+    """Look up the real total value of EXPORTS FROM reporter_country TO partner_country for one
+    product category and year, from UN Comtrade. The direction is always exports out of
+    reporter_country — to ask about the reverse, swap the two countries. The result repeats the
+    direction in its `direction` field; report it as given and do not restate it as an import.
+    Country-level aggregate data only, NOT company/shipment-level (use screen_party for company
+    questions). hs_code is a 2-digit HS chapter, e.g. 72=iron/steel, 27=mineral fuels/crude oil,
+    85=electronics, 84=machinery, 10=cereals, 30=pharma. Recent/current years are often not yet
+    published — an explicit "no data available" is expected and correct in that case, not an
+    error to work around."""
     return logic.fetch_trade_data(
         reporter_country=reporter_country,
         partner_country=partner_country,

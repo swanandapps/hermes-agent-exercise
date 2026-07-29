@@ -130,8 +130,14 @@ def fetch_trade_data(reporter_country: str, partner_country: str, hs_code: str, 
         return {"error": "no data available for this query"}
 
     total = max(r["primaryValue"] for r in aggregate_rows)
+    # flowCode "X" above means exports, but nothing in a bare {reporter, partner, value}
+    # says so, and a model asked for "Germany's exports to Russia" has been observed
+    # reporting it back as "Germany imported from Russia". Direction is not a detail in a
+    # compliance memo, so it is stated in the payload rather than left to be inferred.
     return {
         "value_usd": total,
+        "flow": "exports",
+        "direction": f"exports from {reporter_country} to {partner_country}",
         "year": year,
         "reporter": reporter_country,
         "partner": partner_country,

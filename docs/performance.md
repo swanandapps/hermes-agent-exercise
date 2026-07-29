@@ -443,6 +443,56 @@ Worth being clear about when discovery **is** the point: a server backed by many
 because the useful set cannot be enumerated in a tool list. Ours is two fixed tools. Discovery is
 pure overhead here and load-bearing there; the config switch is how you say which.
 
+### Saying the same thing twice: SOUL.md vs the tool descriptions
+
+`SOUL.md` described both tools — "`screen_party` (checks a name against real US restricted-party
+lists)" — and so did each tool's docstring, which is what Hermes actually sends as the tool
+description. The `screen_party` docstring also ended with "never guess sanctions status without
+calling this", which `SOUL.md` already states as a standing rule. Duplicated in both directions.
+
+The dividing line that survived the argument:
+
+| | belongs in |
+|---|---|
+| what a tool does, when to pick it, how to call it | its docstring — per-tool, routing |
+| standing rules that outlive any one tool | `SOUL.md` — cross-cutting, policy |
+
+So `SOUL.md` keeps "you MUST call the relevant tool — never answer from your own training
+knowledge" (true of any tool we ever add) and drops the per-tool descriptions.
+
+The real argument for deduplicating is not tokens, it is **drift**: a docstring travels with the
+function it documents, a paraphrase in `SOUL.md` does not. Rename a tool and the model gets two
+descriptions that disagree.
+
+**Two things went wrong measuring it, both instructive.**
+
+*First attempt made the prompt bigger.* The replacement read "What each does and when to pick it
+is in its own description — this file does not restate it, so there is only one place to change
+when a tool changes." That explanation is for the human reading the repo, and `SOUL.md` is
+**model-facing** — it has no comment syntax, so every word ships on every call, forever. 6,694 →
+6,731, +37. Rationale belongs in this file, or a commit message, or a YAML comment; never in the
+system prompt. Trimming to just the tool names: 6,696.
+
+*The end-to-end number then lied.* +2 total, when the edited text had demonstrably shrunk 40
+tokens. The confound was `memories/MEMORY.md` — the verification query run in between had written
+a screening outcome into it, adding ~42 tokens to every subsequent call.
+
+```
+  our text        -40
+  MEMORY.md grew  +42
+  ─────────────────────
+  net              +2
+```
+
+Worth stating plainly because it generalises: **long-term memory is a slowly rising tax on every
+call.** It is not a one-off cost, it grows with use, and it makes naive before/after token
+comparisons untrustworthy unless memory is held still. Any real optimisation measurement here has
+to control for it — or measure the edited text directly, which is what settled this one.
+
+Behaviour after the change, single mode, three identical runs: `HIT` verdict 3/3, both tools
+called 3/3, 4,890 prompt tokens 3/3. Routing did not degrade — unsurprising, since the
+descriptions the model routes on never moved.
+
 ## A hypothesis that failed: shrinking the delegation payload
 
 `delegate_task` carries by far the largest argument in this system — the Writer's persona plus

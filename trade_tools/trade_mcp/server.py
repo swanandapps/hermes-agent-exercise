@@ -22,7 +22,7 @@ def screen_party(name: str) -> dict:
     list (OFAC SDN, BIS Entity/Denied Persons, State Dept debarred parties, and others, combined).
     Use this before any trade deal to confirm the counterparty is not sanctioned. Returns
     matched=True with the matching list(s) if found, or matched=False with an explicit
-    "no matches found" message — never guess sanctions status without calling this."""
+    "no matches found" message."""
     return logic.fetch_screen_party(name=name)
 
 

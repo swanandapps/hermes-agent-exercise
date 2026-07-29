@@ -23,8 +23,8 @@ and composable (and your responsibility) in LangChain.
 | `agents/researcher/SOUL.md` | 18 | Agent identity/behaviour — plain Markdown |
 | `agents/researcher/config.yaml` | 16 | MCP server registration + toolset exposure |
 | `config/model.openai.yaml` | 9 | Provider/model block |
-| `tools/trade_mcp/logic.py` | 136 | Our two tools' actual work (HTTP + normalisation) |
-| `tools/trade_mcp/server.py` | 46 | MCP server — one `@mcp.tool()` wrapper each |
+| `trade_tools/trade_mcp/logic.py` | 136 | Our two tools' actual work (HTTP + normalisation) |
+| `trade_tools/trade_mcp/server.py` | 46 | MCP server — one `@mcp.tool()` wrapper each |
 | `run.py` | 106 | Config merge + launch. **Not agent logic.** |
 
 **Lines of agent-loop code written: zero.** No ReAct loop, no tool dispatch, no message history

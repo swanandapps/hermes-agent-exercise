@@ -88,7 +88,7 @@ run.py                      # entrypoint: --mode single | handoff ; reads MODEL 
 agents/researcher/
   SOUL.md                   # agent identity — tools-first, never guess
   config.yaml               # MCP server registration + toolset exposure (overlay)
-tools/trade_mcp/
+trade_tools/trade_mcp/
   logic.py                  # the two tools' real work: HTTP + response normalisation
   server.py                 # stdio MCP server — docstrings are what route the model
   countries.json            # country name → UN M49 code lookup

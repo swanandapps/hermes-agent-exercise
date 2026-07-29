@@ -1,7 +1,7 @@
 # The agent tier: the Hermes runtime plus this project's MCP tool server.
 #
 # Why our tools live in HERE and not in the web container: the config registers them
-# with stdio transport, meaning Hermes launches `python -m tools.trade_mcp.server` as a
+# with stdio transport, meaning Hermes launches `python -m trade_tools.trade_mcp.server` as a
 # child process and talks to it over a pipe. A pipe cannot cross a container boundary,
 # so the tools must sit beside the runtime that spawns them. (MCP also has an HTTP
 # transport, which would let them be their own service — see README.)
@@ -25,7 +25,7 @@ RUN apt-get update \
 # we want. Without it the gateway boots but logs "API Server: aiohttp not installed" and
 # serves nothing — so the container looks alive while being useless. Version matches the
 # pin in Hermes's own pyproject (3.14.1, pinned for CVE fixes).
-# `mcp` is what tools/trade_mcp/server.py imports (FastMCP). Hermes ships its own MCP
+# `mcp` is what trade_tools/trade_mcp/server.py imports (FastMCP). Hermes ships its own MCP
 # *client*, but our server is a separate process that needs the library in its own right —
 # and a container inherits nothing from the developer's machine, where it happened to be
 # in .venv already. Without it the gateway starts fine and simply has no tools:
@@ -42,7 +42,7 @@ RUN pip install --no-cache-dir \
       "pyyaml>=6.0"
 
 WORKDIR /srv
-COPY tools/ ./tools/
+COPY trade_tools/ ./trade_tools/
 COPY agents/ ./agents/
 COPY config/ ./config/
 COPY run.py ./

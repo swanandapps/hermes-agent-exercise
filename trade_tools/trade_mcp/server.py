@@ -2,7 +2,7 @@
 
 Run standalone for manual testing:
 
-    python -m tools.trade_mcp.server
+    python -m trade_tools.trade_mcp.server
 
 Docstrings below ARE the tool descriptions the model sees — they carry the routing guidance,
 not SOUL.md.
@@ -11,7 +11,7 @@ from __future__ import annotations
 
 from mcp.server.fastmcp import FastMCP
 
-from tools.trade_mcp import logic
+from trade_tools.trade_mcp import logic
 
 mcp = FastMCP("trade-compliance")
 

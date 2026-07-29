@@ -3,9 +3,9 @@
 > Written against what this repo actually builds — a trade-compliance Researcher with two real
 > tools — and what the same system looks like in LangChain.
 >
-> Hermes claims are cited to the installed runtime (v0.18.2, MIT, Nous Research — ~658K lines
-> across 901 Python files). LangChain claims verified against current docs, mid-2026. Token and
-> reliability figures are measured on this repo, not estimated.
+> Hermes claims are cited to the installed runtime (v0.18.2, MIT, Nous Research). LangChain
+> claims verified against current docs, mid-2026. Token and reliability figures are measured on
+> this repo, not estimated.
 >
 > **§0 is the one-page version.** Everything after it is the evidence.
 
@@ -89,14 +89,14 @@ Every row is real code, and most are discovered in production rather than on day
 
 ## §2 · What this repo actually contains
 
-| File | Lines | What it is |
-|---|---|---|
-| `agents/researcher/SOUL.md` | 31 | Agent identity and standing rules — plain Markdown |
-| `agents/researcher/config.yaml` | 39 | MCP server registration + toolset exposure |
-| `config/model.openai.yaml` | 9 | Provider block |
-| `trade_tools/trade_mcp/logic.py` | 139 | The two tools' real work — HTTP, retries, normalisation |
-| `trade_tools/trade_mcp/server.py` | 48 | MCP server — one `@mcp.tool()` wrapper each |
-| `run.py` | 106 | Config merge + launch. **Not agent logic.** |
+| File | What it is |
+|---|---|
+| `agents/researcher/SOUL.md` | Agent identity and standing rules — plain Markdown |
+| `agents/researcher/config.yaml` | MCP server registration + toolset exposure |
+| `config/model.*.yaml` | Provider block — one small file per model |
+| `trade_tools/trade_mcp/logic.py` | The two tools' real work — HTTP, retries, normalisation |
+| `trade_tools/trade_mcp/server.py` | MCP server — one `@mcp.tool()` wrapper each |
+| `run.py` | Config merge + launch. **Not agent logic.** |
 
 **Lines of agent-loop code written: zero.** No ReAct loop, no tool dispatch, no history
 management, no retry control. `AIAgent.run_conversation()` supplies all of it.
@@ -117,7 +117,7 @@ agent = create_agent(model="openai:gpt-5-mini",
                      system_prompt=SOUL_TEXT)
 ```
 
-`logic.py` — 139 of our 199 lines of real code — is **byte-identical** in both worlds. It is
+`logic.py` — most of the real code in this repo — is **byte-identical** in both worlds. It is
 domain code, not framework code. **For Part 1 alone the two are close to a wash.**
 
 | This exercise's requirement | Hermes | LangChain |
@@ -183,8 +183,8 @@ new core tool is high."*
 Hermes does **not** force MCP. `PluginContext.register_tool(name, toolset, schema, handler)` takes
 a plain Python callable, exactly like LangChain's `@tool`. We chose MCP anyway, for three reasons:
 
-1. **The schema is generated, so it cannot drift.** With the plugin API you hand-write ~25 lines
-   of JSON and maintain it separately from the function. Add a parameter and forget the schema and
+1. **The schema is generated, so it cannot drift.** With the plugin API you hand-write that JSON
+   and maintain it separately from the function. Add a parameter and forget the schema and
    the model never learns it exists — nothing errors at startup, it just misbehaves at runtime.
 2. **Isolation.** Plugins run *inside* Hermes with full access. Hermes gates this explicitly:
    overriding a built-in requires opt-in, because otherwise *"any enabled plugin could silently
@@ -194,7 +194,7 @@ a plain Python callable, exactly like LangChain's `@tool`. We chose MCP anyway, 
 3. **Portability.** `python -m trade_tools.trade_mcp.server` runs standalone — the same server
    works in Claude Desktop or Cursor, unchanged. A LangChain `@tool` runs in LangChain.
 
-The cost is ~60 lines of wrapper and one IPC hop, invisible next to an HTTP call to trade.gov.
+The cost is a thin wrapper module and one IPC hop, invisible next to an HTTP call to trade.gov.
 
 ### 3.3 · What Hermes wraps MCP in
 
@@ -290,45 +290,7 @@ framework fixes that.
 
 ---
 
-## §7 · Open source, licence and community
-
-| | Hermes | LangChain |
-|---|---|---|
-| **Licence** | MIT | MIT |
-| **Backed by** | Nous Research | LangChain, Inc. (VC-funded) |
-| **Maturity** | pre-1.0 (v0.18.2) | post-1.0, several major API generations |
-| **Community** | small, young | very large — the default answer in most job specs |
-| **Ecosystem** | MCP servers + 8 memory providers + plugins | hundreds of integrations, retrievers, vector stores |
-| **Commercial layer** | none required | LangSmith (tracing/eval) — the funded product |
-| **Hiring pool** | narrow | wide |
-| **Runs fully offline** | yes, by design | yes, if you choose offline components |
-
-Both are MIT, so neither is a licensing risk. The differences that matter operationally:
-
-**Governance shape.** LangChain's open-source core is funded by a commercial observability
-product. That is a healthy, common model, but the incentive gradient points toward the hosted
-service. Hermes has no commercial layer to pull it — the sovereignty story ("runs entirely on your
-own hardware, no required external service") is the point of the project, not a feature of it.
-
-**Ecosystem size is LangChain's genuine moat.** If tomorrow's requirement is a Postgres vector
-retriever, LangChain has one and Hermes does not model retrieval at all. Nothing about Hermes
-prevents you writing it — it just isn't handed to you.
-
-**Both are unstable ground.** LangChain has moved agent APIs twice in about a year
-(`AgentExecutor` → `create_react_agent` → `create_agent`, the first two deprecated). Hermes is
-pre-1.0, and building this exercise found its published docs contradicting its own source in three
-places (`custom_providers` list-vs-dict, the MCP tool-name prefix, and undocumented MCP security).
-**Pin versions and read the source, in either camp.**
-
-**A note on contributing back.** Hermes's `AGENTS.md` ranks contributions explicitly — skill, then
-MCP server, then plugin, and only then core. That ladder is a real advantage for a company like
-PST.AG: domain tools live at the edge, cost nothing to other users, and survive upgrades without
-maintaining a fork. This repo follows it — our tools are an MCP server, and Hermes's own tree is
-untouched.
-
----
-
-## §8 · Honest trade-offs
+## §7 · Honest trade-offs
 
 **Where LangChain wins** — far larger ecosystem; arbitrary graph topologies, cycles and
 human-in-the-loop; it embeds inside your application instead of being the process; LangSmith for
@@ -339,8 +301,12 @@ gateway all present without wiring; provider-agnostic by config; one deployment 
 an assembled stack; and a genuine sovereignty story — MIT, fully local, no required external
 service.
 
-**Where both are the same** — the loop is trivial, the surrounding twenty things are not, and
-neither project's API is stable yet.
+**Where both are the same** — the loop is trivial and the surrounding twenty things are not. And
+neither is stable ground: LangChain has moved agent APIs twice in about a year (`AgentExecutor` →
+`create_react_agent` → `create_agent`, the first two deprecated), while Hermes is pre-1.0 and
+building this exercise found its published docs contradicting its own source in three places
+(`custom_providers` list-vs-dict, the MCP tool-name prefix, and the undocumented MCP security in
+§3.3). **Pin your versions and read the source, in either camp.**
 
 > **Choose Hermes** when you want a sovereign, batteries-included runtime and your control flow
 > fits a ReAct loop with delegation.
@@ -348,5 +314,6 @@ neither project's API is stable yet.
 > **Choose LangChain** when the agent is a component inside a larger application, or you need
 > graph topologies and retrieval infrastructure Hermes does not model.
 >
-> **Choose neither** when you have two tools, one user, and no memory requirement. That is 60
-> lines, and a framework will cost you more in defaults than it saves you in code.
+> **Choose neither** when you have two tools, one user, and no memory requirement. That is the
+> loop in §1 plus your two functions — and a framework will cost you more in defaults than it
+> saves you in code.

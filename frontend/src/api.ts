@@ -177,7 +177,14 @@ export function verdictOf(text: string): Verdict | null {
   // so look past that prefix, but nowhere further: a verdict word buried mid-answer
   // is not a verdict. It also varies the wording — "Hit", "Hit found", "Blocked" —
   // so match on the leading word, anchored, rather than one exact phrase.
-  const head = firstLine.replace(/^direct answer:\s*/i, "").trimStart();
+  // Strip leading markdown before matching. The model very often bolds its verdict
+  // ("**REVIEW** — …") or heads the memo ("### CLEARED"), and an anchored match against the
+  // raw line then fails, so a correct answer renders with no chip at all. Formatting is not
+  // meaning; take it off before deciding.
+  const head = firstLine
+    .replace(/^direct answer:\s*/i, "")
+    .replace(/^[\s>#*_`-]+/, "")
+    .trimStart();
   // opens with a deal-desk decision instead. Both vocabularies map to the same channels.
   // REVIEW before HIT: screening is fuzzy, so most result sets are near-misses rather than
   // matches, and colouring those red is how a red banner stops meaning anything.

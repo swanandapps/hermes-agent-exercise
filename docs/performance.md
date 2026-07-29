@@ -401,3 +401,46 @@ delegating; you cannot pay less and still delegate.
 
 The honest summary: after the platform fix, this is a normally-priced agent. The remaining spend
 is delegation, and delegation is the product.
+
+## A hypothesis that failed: shrinking the delegation payload
+
+`delegate_task` carries by far the largest argument in this system — the Writer's persona plus
+every gathered fact, well over a thousand tokens of prose inside a JSON field. The obvious theory
+was that its size is what makes the call fragile, so the persona was cut from 417 tokens to 105
+(75% smaller) and re-tested on Qwen3-32B, six runs, identical query.
+
+| Persona | Delegation fired |
+|---|---|
+| Full (417 tokens) | 4/8 |
+| Compact (105 tokens) | **3/6** |
+
+**No improvement**, and output quality got worse: one run leaked the persona text into the memo
+itself, because the compact version dropped the explicit "line one is the decision, and nothing
+else" rule that was holding the format. Reverted.
+
+### What the failures actually look like
+
+Worth being precise, because it is not what "unreliable tool calling" suggests. Every failed run
+produced this shape:
+
+```
+delegate_task(
+    goal="You are a compliance officer writing a due-diligence memo…
+          Line 1 is the decision: DO NOT PROCEED…",
+    context="Original question: Germany iron and steel (HS…
+```
+
+The model **decided to delegate correctly** and **composed correct arguments** — right decision,
+right lists, right figure. It then wrote them as plain text instead of emitting them through the
+structured tool-calling channel.
+
+That is a **serialisation failure, not a reasoning failure**, and it reframes the whole finding:
+
+- The two research tools never failed once, on any model, including Llama-3.1-8B.
+- What varies between models is not whether they can *use* tools, but whether they reliably emit
+  a large call through the structured channel rather than narrating it.
+- So the fix is not a better prompt or a smaller payload. It is model selection:
+  `qwen3.7-flash` delivered 3/3 where `qwen3-32b` gives roughly half.
+
+**Practical consequence:** run the demo on `MODEL=fast`. It is faster (~28 s vs ~54 s), cheaper,
+and the only configuration measured to delegate every time.

@@ -99,6 +99,29 @@ hermes -p hermes-exercise gateway run --replace > .logs/gateway.log 2>&1 &
 PIDS+=($!)
 wait_for "http://127.0.0.1:$GATEWAY_PORT/health" "gateway  :$GATEWAY_PORT" 90
 
+# /health only says the gateway is listening. If the MCP server fails to start, Hermes
+# retries three times, PARKS it, and then serves happily with no tools at all — the agent
+# answers from its own knowledge and nothing on screen says the tools were missing.
+#
+# The retries back off 1s, 2s, 4s, so the give-up line lands ~7s after startup. Poll for it
+# rather than sleeping a guessed amount: a check that runs too early always passes, which is
+# worse than no check.
+MCP_FAIL='failed initial connection after|no valid toolsets configured|failed to start'
+tools_ok=1
+for _ in $(seq 1 15); do
+  if grep -qE "$MCP_FAIL" .logs/gateway.log 2>/dev/null; then tools_ok=0; break; fi
+  sleep 1
+done
+if (( tools_ok == 0 )); then
+  echo ""
+  echo "✗ The trade-compliance MCP server did not register — the agent has NO TOOLS."
+  echo "  It will still answer, from training knowledge, and look plausible."
+  echo ""
+  grep -E "$MCP_FAIL" .logs/gateway.log | tail -2 | sed 's/^/    /'
+  exit 1
+fi
+echo "  ✓ tools registered"
+
 # ── 2. the relay ─────────────────────────────────────────────────────────────
 uvicorn backend.app:app --port "$BACKEND_PORT" > .logs/backend.log 2>&1 &
 PIDS+=($!)

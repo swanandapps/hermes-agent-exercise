@@ -567,6 +567,36 @@ weights.
 **153.8 s versus ~25 s** for the same class of question on `qwen3.7-flash` via OpenRouter — about
 6× slower, on a machine with no free RAM. Usable for a demonstration; not usable as a product.
 
+### And it is not only slower — re-run after the REVIEW work
+
+Re-tested once the tool started returning `match_quality`, on the same 3B model (46 s this time,
+the model already resident):
+
+> `HIT` — Rosneft Trading S.A. — match_quality: "exact" — **the party is not sanctioned**, based
+> on screening against US government restricted-party lists.
+
+Right verdict word, right field quoted from the payload, and then the opposite of what both mean,
+in the same sentence. The tool call was correct and the data was correct; the model could not hold
+the finding together in prose.
+
+`qwen3.7-flash` given the identical payload answers correctly every time. So the failure is not
+the tools, the schema or the prompt — it is capacity, and it shows up precisely where a compliance
+answer must not fail: in the sentence a human reads.
+
+Which sharpens the Part 3 conclusion. "Runs on open weights" and "is safe on open weights" are
+different claims:
+
+| | qwen2.5:3b, local | qwen3.7-flash, hosted |
+|---|---|---|
+| Calls the right tool | ✅ | ✅ |
+| Reads the payload | ✅ | ✅ |
+| States the finding coherently | ❌ **contradicted itself** | ✅ |
+| Latency | 46–154 s | ~25 s |
+
+The portability is real and is worth demonstrating — same agent, same tools, one config line. The
+honest recommendation is still a larger model for anything a compliance officer would act on, and
+a 3B model only for proving the swap works.
+
 Quality also drops noticeably. The 3B model got the facts right but ignored the response contract
 in `SOUL.md`: no `HIT` verdict line, several hundred words of hedging, and it named the internal
 tool (`mcp__trade_compliance__screen_party`) in user-facing output. Compare the cloud models,

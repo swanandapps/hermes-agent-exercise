@@ -402,6 +402,47 @@ delegating; you cannot pay less and still delegate.
 The honest summary: after the platform fix, this is a normally-priced agent. The remaining spend
 is delegation, and delegation is the product.
 
+### Turning off MCP discovery: small, but the right *kind* of fix
+
+MCP has three primitives — tools, resources and prompts — and Hermes registers a discovery tool for
+each family a server advertises: `list_resources`, `read_resource`, `list_prompts`, `get_prompt`.
+Our server exposes two tools and nothing else. But **FastMCP advertises the resources and prompts
+capabilities unconditionally**, so Hermes was right to believe there was something to browse, and
+offered the agent four tools that could only ever return empty.
+
+Hermes does try to filter these — `_select_utility_schemas` checks the server's advertised
+capabilities before registering. That gate simply cannot fire when the server over-advertises. So
+we say it explicitly in `agents/researcher/config.yaml`:
+
+```yaml
+mcp_servers:
+  trade-compliance:
+    tools:
+      resources: false
+      prompts: false
+```
+
+| | prompt tokens/call |
+|---|---|
+| before | 6,932 |
+| after | **6,694** |
+
+238 tokens — about 60 per schema, which is what four small schemas should cost. Small. The reason
+it is worth doing anyway is the *other* effect: on qwen2.5:3b, two of the model's calls went to
+`list_prompts` and `list_resources` before it answered. A wasted call costs a full round trip, not
+60 tokens.
+
+The alternative was a line in `SOUL.md` telling the model not to call them. That was the first
+instinct and it is worth naming why it is weaker: a prompt instruction *asks*, and the schemas
+stay in context either way. Config *removes*. Anything the model cannot see, it cannot waste a
+call on — this is the same lesson as the `platform_toolsets` fix, just three orders of magnitude
+smaller.
+
+Worth being clear about when discovery **is** the point: a server backed by many or changing items
+— a filesystem, a document store, PST.AG's 250+ trade agreements — needs the agent to browse,
+because the useful set cannot be enumerated in a tool list. Ours is two fixed tools. Discovery is
+pure overhead here and load-bearing there; the config switch is how you say which.
+
 ## A hypothesis that failed: shrinking the delegation payload
 
 `delegate_task` carries by far the largest argument in this system — the Writer's persona plus

@@ -10,6 +10,22 @@ mcp_servers:
       PYTHONPATH: "__REPO_ROOT__"
       TRADE_GOV_API_KEY: "${TRADE_GOV_API_KEY}"
     enabled: true
+    tools:
+      # MCP has three primitives — tools, resources and prompts — and Hermes registers a
+      # discovery tool for each family a server advertises (list_resources, read_resource,
+      # list_prompts, get_prompt). This server exposes two tools and nothing else, but FastMCP
+      # advertises the resources and prompts capabilities unconditionally, so Hermes correctly
+      # believes there is something to browse and offers the agent four extra tools that can
+      # only ever return empty.
+      #
+      # Not free: four schemas in every prompt, and models do go looking. qwen2.5:3b spent two
+      # of its calls on list_prompts/list_resources before answering.
+      #
+      # Discovery earns its place when a server holds many or changing items — a filesystem, a
+      # document store, PST.AG's 250+ trade agreements. It is pure overhead when the tool list
+      # is two items long and fixed.
+      resources: false
+      prompts: false
 
 # Toolsets are looked up per PLATFORM (hermes_cli/tools_config.py). The CLI and the
 # gateway are different platforms — the gateway identifies as "api_server"

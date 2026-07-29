@@ -70,14 +70,14 @@ built React UI). Nothing Anthropic is involved at any point.
 **To run the model locally instead**, on your own weights:
 
 ```bash
-docker compose --profile ollama up -d ollama
-docker compose exec ollama ollama pull qwen2.5:3b      # ~1.9 GB, once
-MODEL=ollama docker compose --profile ollama up --build
+ollama pull qwen2.5:3b        # ~1.9 GB, once
+MODEL=ollama ./dev.sh         # then open http://localhost:5173
 ```
 
-Ollama is behind a compose profile so it is only pulled when you ask for it. Expect it to be
-slow — see [performance notes](docs/performance.md) for measured numbers and the honest
-limitations of a 3B model on this task.
+There is also an `ollama` compose profile, but native is the documented path: Docker Desktop's
+memory allowance is usually well below the machine's, and Ollama inside it cannot allocate the
+64 K context Hermes requires. See [performance notes](docs/performance.md) — measured numbers,
+why that happens, and the honest limits of a 3B model on this task.
 
 > Stop any local `hermes gateway` / `uvicorn` first — they bind the same ports, and on macOS both
 > can hold them, so you cannot tell which one answered.

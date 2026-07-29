@@ -29,17 +29,34 @@ see *The local ceiling* below.
 cp .env.example .env          # OPENROUTER_API_KEY + TRADE_GOV_API_KEY
 export $(grep -v '^#' .env | grep -v '^$' | xargs)
 
-# cloud open-weight model, full stack, no Anthropic
+# cloud open-weight model, whole stack in Docker, no Anthropic
 MODEL=openrouter docker compose up --build          # then open http://localhost:8000
 
-# local open-weight model, weights in a container
-docker compose --profile ollama up -d ollama
-docker compose exec ollama ollama pull qwen2.5:3b   # ~1.9 GB, once
-MODEL=ollama docker compose --profile ollama up --build
+# local open-weight model
+ollama pull qwen2.5:3b                              # ~1.9 GB, once
+MODEL=ollama ./dev.sh                               # then open http://localhost:5173
 ```
 
-Without Docker: `MODEL=openrouter python run.py --mode handoff`, or `./dev.sh handoff` for the
-gateway, relay and UI together.
+### Why the local model runs outside Docker
+
+There is an `ollama` compose profile, and it works in the sense that the container starts, the
+gateway reaches it, and a request completes. It is not the recommended path, for a reason worth
+stating:
+
+**Docker Desktop's memory allowance is typically far below the machine's.** On the laptop this
+was measured on, Docker had **3.8 GB** against 8 GB of host RAM. Ollama inside that allowance
+cannot allocate the 64 K context Hermes requires — it silently loaded a **4,096-token window**
+instead, and a 3B model handed a ~2 K prompt at that size returned an unparseable stub. The
+gateway retried three times and reported an empty response. Nothing errored in a way that
+pointed at memory.
+
+Pointing the containerised gateway at an Ollama on the host is supported —
+`OLLAMA_BASE_URL=http://host.docker.internal:11434/v1` — but Ollama binds `127.0.0.1` by default,
+so it also needs `OLLAMA_HOST=0.0.0.0` before a container can reach it.
+
+Running Ollama natively avoids both, which is why it is the documented path. The cloud
+open-weight model is the one that runs entirely in Docker, and that is what the compose file is
+for.
 
 ---
 
@@ -55,7 +72,7 @@ Same query on every model, same gateway, `--mode handoff`:
 | **Qwen3.7-Flash** (cloud) | ✅ both | ✅ | **5–25 s** | ✅ memo |
 | **Qwen3-32B** (cloud) | ✅ both | ✅ | 127.6 s | ✅ memo, looser wording |
 | **Llama-3.1-8B** (cloud) | ✅ both | ❌ **failed** | 21.0 s | ❌ raw JSON |
-| **Qwen2.5-3B** (local, Ollama) | ✅ | n/a | 46–154 s | ⚠️ contradicted itself |
+| **Qwen2.5-3B** (local, Ollama, native) | ✅ | n/a | 46–154 s | ⚠️ contradicted itself |
 | GPT-5-mini (hosted, baseline) | ✅ both | ✅ | ~50 s | ✅ memo |
 
 **Sample size is one run per model for the slower rows.** Directional findings, not benchmarks.

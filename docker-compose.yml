@@ -27,7 +27,10 @@ services:
       API_SERVER_KEY: ${API_SERVER_KEY:-hermes-exercise-local-dev-key}
       # Only consulted when MODEL=ollama. Service name, not localhost: inside the
       # compose network each service is reachable by its own name.
-      OLLAMA_BASE_URL: http://ollama:11434/v1
+      # Defaults to the compose service. Override to point at an Ollama running on the host —
+      # OLLAMA_BASE_URL=http://host.docker.internal:11434/v1 — which is the practical choice on a
+      # laptop, since Docker Desktop's memory allowance is usually well below the machine's.
+      OLLAMA_BASE_URL: ${OLLAMA_BASE_URL:-http://ollama:11434/v1}
     volumes:
       # Memory, session history and the synced profile outlive `docker compose down`.
       - hermes-profile:/data/hermes

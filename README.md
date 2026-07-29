@@ -53,10 +53,10 @@ python run.py             # interactive CLI
 ### With the web UI
 
 ```bash
-hermes -p hermes-exercise gateway run &      # the agent
-uvicorn backend.app:app --port 8000 &        # the relay
-cd frontend && npm install && npm run dev    # the UI
+./dev.sh          # gateway + relay + UI, one command. Ctrl-C stops all three.
 ```
+
+Open **http://localhost:5173**.
 
 The UI shows a live audit trail — every tool call, its arguments, how long it took, and the
 model's reasoning — so you can watch the agent decide rather than just read its answer.

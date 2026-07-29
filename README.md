@@ -11,7 +11,7 @@ hosted *or* open-weight models by changing one config line — not by rewriting 
 | **1** | Single tool-using agent | ✅ `v1-single` |
 | **2** | Researcher → Writer handoff + long-term memory | ✅ `v2-handoff` |
 | **3** | Two open-weight models, no Anthropic, Dockerised | ✅ `v3-open-weight` |
-| — | [Hermes vs LangChain](docs/hermes-vs-langchain.md) (presented live) | ✅ |
+| — | [Hermes vs LangChain](docs/hermes-vs-langchain.md) — one page, presented live ([evidence](docs/hermes-vs-langchain-detail.md)) | ✅ |
 | — | [Performance notes](docs/performance.md) | ✅ |
 
 ---

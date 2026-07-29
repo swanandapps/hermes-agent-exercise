@@ -1,0 +1,329 @@
+# Hermes vs LangChain
+
+> Written against what this repo actually builds — a trade-compliance Researcher with two real
+> tools — and what the same system looks like in LangChain.
+>
+> Hermes claims are cited to the installed runtime (v0.18.2, MIT, Nous Research). LangChain
+> claims verified against current docs, mid-2026. Token and reliability figures are measured on
+> this repo, not estimated.
+>
+> **This is the evidence.** The one-page comparison is
+> [`hermes-vs-langchain.md`](hermes-vs-langchain.md); everything here is what backs it up.
+
+---
+
+## §0 · The one page
+
+**Hermes is a runtime you configure. LangChain is a library you assemble.**
+
+Both give you a tool-using agent quickly. They diverge on everything *around* the agent.
+
+| | Hermes | LangChain |
+|---|---|---|
+| **What you get** | a running process | a set of parts |
+| **The agent loop** | ships | ships (`create_agent`) |
+| **Sessions across restarts** | ships | you wire a checkpointer |
+| **Long-term memory** | ships | you wire a store, and a tool to write to it |
+| **A second agent** | one config line | you build the graph |
+| **Swap the model** | a 4-line YAML file | a code change + a pip install |
+| **Web API + streaming** | ships | you write a server |
+| **Control flow** | fixed ReAct loop | any graph you can draw |
+| **Where it lives** | *is* the process | embeds in your app |
+
+**The honest summary:** for a two-tool demo, LangChain is less work. This exercise asked for
+memory, a second agent, and a model swap — and that is exactly where the columns flip.
+
+**Neither framework's real value is the loop.** The loop is ~15 lines and you can write it (§1).
+The value is the twenty things around it you only discover you need once real users arrive.
+
+---
+
+## §1 · The thing neither framework is
+
+Before comparing frameworks, it's worth knowing what they save you from. Here is a complete,
+working agent loop with no framework at all:
+
+```python
+messages = [{"role": "system", "content": SOUL}, {"role": "user", "content": question}]
+
+while True:
+    reply = client.chat.completions.create(
+        model=MODEL, messages=messages, tools=TOOL_SCHEMAS
+    ).choices[0].message
+    messages.append(reply)
+
+    if not reply.tool_calls:
+        return reply.content                      # the model is done
+
+    for call in reply.tool_calls:                 # run what it asked for
+        result = DISPATCH[call.function.name](**json.loads(call.function.arguments))
+        messages.append({"role": "tool", "tool_call_id": call.id,
+                         "content": json.dumps(result)})
+```
+
+That is the whole ReAct cycle: send the tools, the model picks one, run it, append the result,
+go round again. **Anyone claiming you need a framework for this is selling something.**
+
+What those 15 lines do **not** handle:
+
+| Reality | What you write |
+|---|---|
+| the model call fails | retries, backoff, retry-vs-abort |
+| the model returns malformed arguments | it does — repair, reject, re-prompt |
+| the conversation outgrows the context window | truncation or summarisation, and *what* to drop |
+| the user closes the tab and returns | session persistence |
+| "what did we screen last Tuesday?" | search over past transcripts |
+| facts that should outlive the session | memory, plus a policy for what earns a place in it |
+| a second agent | spawn, scope its tools, collect, bound recursion |
+| tools written by someone else | a protocol, a handshake, schema translation, sandboxing |
+| a different model provider | per-provider quirks, token fields, context floors |
+| a web UI | an API server, streaming, auth |
+| "what did this cost?" | token accounting across every call in a turn |
+
+Every row is real code, and most are discovered in production rather than on day one.
+
+> **Break-even:** roughly *the moment the second conversation has to remember the first.*
+> Before that, a framework is overhead. After that, you are writing session storage, then search
+> over it, then memory policy — building a worse Hermes, part-time, while shipping a product.
+
+---
+
+## §2 · What this repo actually contains
+
+| File | What it is |
+|---|---|
+| `agents/researcher/SOUL.md` | Agent identity and standing rules — plain Markdown |
+| `agents/researcher/config.yaml` | MCP server registration + toolset exposure |
+| `config/model.*.yaml` | Provider block — one small file per model |
+| `trade_tools/trade_mcp/logic.py` | The two tools' real work — HTTP, retries, normalisation |
+| `trade_tools/trade_mcp/server.py` | MCP server — one `@mcp.tool()` wrapper each |
+| `run.py` | Config merge + launch. **Not agent logic.** |
+
+**Lines of agent-loop code written: zero.** No ReAct loop, no tool dispatch, no history
+management, no retry control. `AIAgent.run_conversation()` supplies all of it.
+
+### The same thing in LangChain
+
+```python
+from langchain.agents import create_agent
+from langchain_core.tools import tool
+
+@tool
+def screen_party(name: str) -> dict:
+    """Check a name against US restricted-party lists..."""   # same docstring-as-routing idea
+    return logic.fetch_screen_party(name)
+
+agent = create_agent(model="openai:gpt-5-mini",
+                     tools=[screen_party, trade_data_lookup],
+                     system_prompt=SOUL_TEXT)
+```
+
+`logic.py` — most of the real code in this repo — is **byte-identical** in both worlds. It is
+domain code, not framework code. **For Part 1 alone the two are close to a wash.**
+
+| This exercise's requirement | Hermes | LangChain |
+|---|---|---|
+| single tool-using agent | config + tools | `create_agent(...)`, ~10 lines |
+| Researcher → Writer handoff | `delegate_task` exists; add `delegation` to config | `langgraph-supervisor`, or `StateGraph` + `Command` (~15–40 lines you own) |
+| long-term memory across turns | two config flags | checkpointer (short-term) **+** `langgraph.store` (long-term) — two systems, a backend, and a tool to write with |
+| swap to open-weight models | change the `model:` block | `init_chat_model("ollama:...")` — ~1 line, but a pip install per provider |
+
+---
+
+## §3 · Tool definition — where most of the real difference lives
+
+### 3.1 · The model never sees your code
+
+It sees a JSON schema. This is what our `trade_data_lookup` function actually becomes:
+
+```json
+{
+  "name": "trade_data_lookup",
+  "description": "Look up real total import/export value between two countries for one
+    product category and year, from UN Comtrade — country-level aggregate data only, NOT
+    company/shipment-level (use screen_party for company questions). hs_code is a 2-digit
+    HS chapter, e.g. 72=iron/steel, 27=mineral fuels, 85=electronics...",
+  "parameters": {
+    "properties": {
+      "reporter_country": { "type": "string" },
+      "partner_country":  { "type": "string" },
+      "hs_code":          { "anyOf": [{"type": "string"}, {"type": "integer"}] },
+      "year":             { "type": "integer" }
+    },
+    "required": ["reporter_country", "partner_country", "hs_code", "year"]
+  }
+}
+```
+
+Every field was read off the Python function: **name** from the function name, **description**
+from the docstring, **properties** from the type hints, **required** from which parameters lack
+defaults.
+
+Two things follow, and they drive real decisions:
+
+**The docstring is the routing signal.** It is the *only* text the model has when deciding whether
+this tool answers the question. That is why ours says "NOT company/shipment-level (use
+`screen_party` for company questions)" — a signpost for the model, not a note for developers. It
+is also why `SOUL.md` in this repo deliberately does **not** describe the tools: the schema is
+generated from the function and cannot drift from it, but a paraphrase elsewhere can.
+
+**Schemas are the prompt's bulk.** That block is ~250 tokens, sent on *every* model call. See §5.
+
+### 3.2 · Three ways into Hermes, and why we chose the third
+
+Hermes's own contribution guide (`AGENTS.md`) states the rule: *"The core is a narrow waist;
+capability lives at the edges. Every model tool we add is sent on every API call, so the bar for a
+new core tool is high."*
+
+| Route | Schema | Runs in | Cost to users who don't enable it | Portable |
+|---|---|---|---|---|
+| **Core tool** (fork Hermes) | hand-written | Hermes process | **every user, every call, forever** | no |
+| **Plugin** (`ctx.register_tool`) | **hand-written** | Hermes process, full access | none | no |
+| **MCP server** ← *ours* | **generated** | its own subprocess | none | **any MCP client** |
+
+Hermes does **not** force MCP. `PluginContext.register_tool(name, toolset, schema, handler)` takes
+a plain Python callable, exactly like LangChain's `@tool`. We chose MCP anyway, for three reasons:
+
+1. **The schema is generated, so it cannot drift.** With the plugin API you hand-write that JSON
+   and maintain it separately from the function. Add a parameter and forget the schema and
+   the model never learns it exists — nothing errors at startup, it just misbehaves at runtime.
+2. **Isolation.** Plugins run *inside* Hermes with full access. Hermes gates this explicitly:
+   overriding a built-in requires opt-in, because otherwise *"any enabled plugin could silently
+   replace a privileged built-in like `shell_exec` and exfiltrate everything the model invokes
+   through it."* For a tool holding a government API key, a subprocess boundary is the right
+   default.
+3. **Portability.** `python -m trade_tools.trade_mcp.server` runs standalone — the same server
+   works in Claude Desktop or Cursor, unchanged. A LangChain `@tool` runs in LangChain.
+
+The cost is a thin wrapper module and one IPC hop, invisible next to an HTTP call to trade.gov.
+
+### 3.3 · Side by side
+
+| | Hermes | LangChain |
+|---|---|---|
+| **Define a tool** | `@mcp.tool()` (MCP) or `register_tool` (plugin) | `@tool` / `StructuredTool` |
+| **Schema from type hints** | yes, via MCP | yes |
+| **Bound to** | a toolset, reusable across agents | per agent, via `.bind_tools()` |
+| **MCP support** | first-class config key | `langchain-mcp-adapters` add-on package |
+| **Injection scan of tool descriptions** | yes | no equivalent |
+| **Malware preflight before spawning a server** | yes — OSV.dev | no equivalent |
+| **Filtered subprocess environment** | yes | n/a |
+| **Approval gating** | yes | no equivalent |
+
+**MCP is not a Hermes advantage** — LangChain supports it too. The difference is that it is a
+config key in one and an add-on package in the other, and that none of the security machinery in
+the lower half of that table has a LangChain equivalent out of the box. All four rows are
+undocumented; they are in `tools/mcp_tool.py`.
+
+> **A real gotcha.** That env filtering (`_build_safe_env()`) means an MCP subprocess does *not*
+> inherit your shell. Our `TRADE_GOV_API_KEY` silently arrived empty and the agent hallucinated
+> instead of calling the tool. Fix: explicit `${VAR}` passthrough in the server's `env:` block.
+> Good security default, sharp edge, no mention in the docs.
+
+---
+
+## §4 · State and memory
+
+| What you need | Hermes | LangChain |
+|---|---|---|
+| **History within a session** | automatic | a checkpointer you wire |
+| **Survives a restart** | automatic — SQLite `state.db` | `SqliteSaver` / `PostgresSaver` |
+| **Curated long-term facts** | `MEMORY.md` / `USER.md`, injected at session start | `langgraph.store` **+** a tool you write so the agent can save |
+| **Search past transcripts** | `session_search` — SQLite FTS5, **no LLM in the search path** | build it |
+| **Procedural playbooks** | Skills (`SKILL.md`) | no equivalent |
+| **Semantic / vector recall** | not by default | your choice of vector store |
+| **Hosted memory service** | one `memory.provider` key — 8 ship (Hindsight, Mem0, Honcho, …), zero app code | pick and wire your own |
+
+`ConversationBufferMemory` and friends are deprecated in LangChain (moved to `langchain-classic`).
+
+*Consequence:* Hermes gives persistence free but on its terms — a char cap on `MEMORY.md`, keyword
+rather than semantic search by default. LangChain gives no default and total choice, including
+vector recall: more work, more capability.
+
+> **Measured, and rarely mentioned:** memory is a **rising tax on every call**. Editing this
+> repo's prompt to remove 40 tokens showed a *net +2*, because `MEMORY.md` had grown 42 tokens in
+> between. Long-term memory is not a one-off cost, and it quietly invalidates naive before/after
+> token comparisons.
+
+---
+
+## §5 · What it costs — measured on this repo
+
+Framework comparisons usually stop at lines of code. The number that reaches the invoice is
+tokens, and a framework's **defaults** decide most of it.
+
+| State | Tools in prompt | Prompt tokens/call |
+|---|---|---|
+| Hermes defaults | 49 | **21,373** |
+| after scoping `platform_toolsets` | 5 | **6,932** |
+| after disabling unused MCP discovery | 5 | **6,694** |
+
+**A 68% cut, from config alone.** The cause is worth naming: Hermes resolves toolsets *per
+platform*, and the CLI and the web gateway are different platforms (`cli` vs `api_server`).
+Configuring only the CLI left the gateway silently running all 49 tools.
+
+Two things generalise beyond Hermes:
+
+- **The saving multiplies.** One question is 4–5 model calls, each carrying the full tool menu.
+  14,441 tokens saved per call is ~72,000 per question.
+- **Fewer tools also worked better.** A model choosing among 5 tools routes more reliably than one
+  choosing among 49. Cost and quality moved together, which is rare.
+
+A framework's defaults are tuned for a *general* assistant, not for your agent. Knowing the loop
+is 15 lines (§1) is precisely what makes 21,373 tokens look wrong rather than inevitable.
+
+---
+
+## §6 · Provider swap
+
+| | Hermes | LangChain |
+|---|---|---|
+| **What you change** | a YAML overlay | a line of code |
+| **How** | `MODEL=openrouter python run.py` | `init_chat_model("ollama:...")` |
+| **Install needed** | none | that provider's integration package |
+| **Redeploy** | no | yes |
+| **Agent or tool code touched** | none | none |
+
+Both are genuinely about one line. The difference is that one is config and one is code — which
+matters when the person switching models is not the person who can deploy.
+
+> **The one-line swap is real in both. The assumption that behaviour is identical afterwards is
+> not.** Measured here on Qwen3-32B: the two research tools never failed, but **delegation
+> succeeded 4 times in 8** — a coin flip. The failure is specific: the model writes
+> `delegate_task(goal="...")` as plain text in the `content` field instead of the structured
+> `tool_calls` field. **A serialisation failure, not a reasoning failure** — it knew what to do and
+> said it in the wrong box. Nested tool calls are where open-weight models break first, and no
+> framework fixes that.
+
+---
+
+## §7 · Honest trade-offs
+
+| Dimension | Hermes | LangChain | Better |
+|---|---|---|---|
+| **Control flow** | fixed ReAct loop + delegation | any graph — cycles, interrupts, human-in-the-loop | LangChain |
+| **Ecosystem** | MCP servers, 8 memory providers, plugins | retrievers, vector stores, hundreds of integrations | LangChain |
+| **Where it lives** | *is* the process | embeds inside your application | LangChain |
+| **Tracing / evaluation** | none built in | LangSmith | LangChain |
+| **Batteries** | memory, sessions, delegation, gateway — all present | you wire each one | Hermes |
+| **Provider swap** | config | code + install | Hermes |
+| **Deployment surface** | one runtime | an assembled stack | Hermes |
+| **MCP security** | injection scan, malware preflight, env filtering | none out of the box | Hermes |
+| **Sovereignty** | MIT, fully local, no required external service | possible, but your choice to assemble | Hermes |
+| **API stability** | pre-1.0 | agent API moved twice in ~a year | *neither* |
+
+**On that last row** — this is the one people skip. LangChain went `AgentExecutor` →
+`create_react_agent` → `create_agent`, with the first two deprecated. Hermes is pre-1.0, and
+building this exercise found its published docs contradicting its own source in three places
+(`custom_providers` list-vs-dict, the MCP tool-name prefix, and the undocumented MCP security in
+§3.3). **Pin your versions and read the source, in either camp.**
+
+> **Choose Hermes** when you want a sovereign, batteries-included runtime and your control flow
+> fits a ReAct loop with delegation.
+>
+> **Choose LangChain** when the agent is a component inside a larger application, or you need
+> graph topologies and retrieval infrastructure Hermes does not model.
+>
+> **Choose neither** when you have two tools, one user, and no memory requirement. That is the
+> loop in §1 plus your two functions — and a framework will cost you more in defaults than it
+> saves you in code.

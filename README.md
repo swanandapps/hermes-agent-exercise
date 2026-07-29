@@ -76,11 +76,20 @@ a cloud API — only the Ollama path runs weights in a container.
 python -m venv .venv && . .venv/bin/activate
 pip install -r requirements.txt
 hermes profile create hermes-exercise
+cp .env.example .env            # add OPENROUTER_API_KEY and TRADE_GOV_API_KEY
 
-export $(grep -v '^#' .env | grep -v '^$' | xargs)
-python run.py --mode single     # Part 1
-python run.py --mode handoff    # Part 2
+./dev.sh                        # Part 1 — gateway + relay + UI, one command
+./dev.sh handoff                # Part 2
+MODEL=ollama ./dev.sh           # Part 3, self-hosted
 ```
+
+Open **http://localhost:5173**. Ctrl-C stops all three.
+
+`dev.sh` re-syncs the Hermes profile before starting. That matters: the profile lives outside
+git, so switching branches does *not* update it, and demoing handoff against a stale single-mode
+profile fails silently.
+
+For the CLI instead of the UI: `python run.py --mode single|handoff`.
 
 ---
 

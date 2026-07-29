@@ -444,3 +444,59 @@ That is a **serialisation failure, not a reasoning failure**, and it reframes th
 
 **Practical consequence:** run the demo on `MODEL=fast`. It is faster (~28 s vs ~54 s), cheaper,
 and the only configuration measured to delegate every time.
+
+## The self-hosted half: Ollama, actually run
+
+Earlier this page asserted that local hosting was infeasible on an 8GB machine — that Hermes's
+64K context floor could not be met because the system prompt was ~55K. **That assertion was
+written before the platform-toolset fix and is wrong.** With the prompt at ~7K it fits easily.
+The optimisation is what made the requirement achievable; the constraint was self-inflicted.
+
+Run for real, `qwen2.5:3b` under Ollama on an 8GB MacBook Air:
+
+| | Result |
+|---|---|
+| Model load at `num_ctx: 65536` | **12.9 s**, succeeded |
+| Resident memory once loaded | ~4.1 GB wired (weights are 1.9 GB — the 64K KV cache is the rest) |
+| Free RAM during the run | ~120 MB |
+| Tool call | ✅ `screen_party` fired, returned real SDN/EL/SSI matches |
+| Answer | correct — named all three lists |
+| **Latency** | **153.8 s** |
+
+So the "self-hostable" claim in Part 3 is not theoretical here: the same agent, same tools, same
+config mechanism, running against weights on the laptop with no cloud model involved.
+
+**The floor is checked against what Ollama actually loaded**, not what the config declares
+(`agent/conversation_loop.py`) — so `ollama_num_ctx: 65536` is mandatory. Declaring 64K while
+quietly allocating less is not possible, and that KV cache is what costs the memory, not the
+weights.
+
+### What it costs
+
+**153.8 s versus ~25 s** for the same class of question on `qwen3.7-flash` via OpenRouter — about
+6× slower, on a machine with no free RAM. Usable for a demonstration; not usable as a product.
+
+Quality also drops noticeably. The 3B model got the facts right but ignored the response contract
+in `SOUL.md`: no `HIT` verdict line, several hundred words of hedging, and it named the internal
+tool (`mcp__trade_compliance__screen_party`) in user-facing output. Compare the cloud models,
+which produce the memo format as instructed.
+
+It also burned two calls on `list_prompts` and `list_resources` — the MCP discovery tools that
+exist because FastMCP advertises resource and prompt capabilities our server does not implement.
+Larger models ignore them; this one went looking.
+
+### The honest framing for Part 3
+
+| | Cloud endpoint (OpenRouter) | Self-hosted (Ollama) |
+|---|---|---|
+| Open weights | ✅ | ✅ |
+| Runs the tools | ✅ | ✅ |
+| Runs the handoff | ✅ (`qwen3.7-flash` 3/3) | ✗ not attempted — an 8B could not delegate, a 3B will not |
+| Latency | ~25 s | ~154 s |
+| Cost | ~$0.001/turn | free |
+| Data leaves the machine | yes | **no** |
+
+Both halves of the requirement are real. The split is deliberate: the cloud endpoint carries the
+live demo because it is six times faster and can complete the handoff; Ollama proves the same
+configuration runs on hardware you own, which is the claim that matters for a company selling
+sovereign compliance data.

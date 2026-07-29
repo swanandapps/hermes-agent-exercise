@@ -1,10 +1,21 @@
-# Model overlay — OPEN-WEIGHT, SELF-HOSTED local (Ollama). MODEL=ollama. The "self-hostable" proof.
-# 8GB laptop can't do a 64K-context model locally (Hermes's floor), so use a SMALL model for the local
-# demo and let OpenRouter carry the heavy runs. `ollama pull qwen2.5:3b` first.
+# Model overlay — OPEN-WEIGHT, SELF-HOSTED locally via Ollama. Selected by MODEL=ollama.
+# This is the "self-hostable" half of Part 3; config/model.openrouter.yaml is the cloud half.
+#
+#   ollama pull qwen2.5:3b
+#   MODEL=ollama python run.py --mode single
+#
+# Hermes enforces a 64K minimum context (agent/model_metadata.py: MINIMUM_CONTEXT_LENGTH) and it
+# checks the context Ollama ACTUALLY loaded, not what we declare here — so ollama_num_ctx must be
+# 65536 as well. There is no way to satisfy the floor while quietly allocating a smaller window.
+#
+# On an 8GB machine that, not the weights, is the binding constraint: qwen2.5:3b is only 1.9GB, but
+# a 64K KV cache on top of it is what exhausts memory. See docs/performance.md for what actually
+# happened when this was run.
 model:
-  provider: custom
-  default: qwen2.5:3b                       # or llama3.2:3b — a second open model for the "two models" ask
+  provider: custom          # aliases: ollama, local, vllm, llamacpp
+  default: qwen2.5:3b
   base_url: http://localhost:11434/v1
-  key_env: OLLAMA_API_KEY                   # any value; Ollama ignores the key
-  context_length: 32768
-  max_tokens: 4096   # cap the per-call output reservation (see model.openrouter.yaml)
+  key_env: OLLAMA_API_KEY   # any value; Ollama ignores it
+  context_length: 65536
+  ollama_num_ctx: 65536     # maps to extra_body.options.num_ctx
+  max_tokens: 4096

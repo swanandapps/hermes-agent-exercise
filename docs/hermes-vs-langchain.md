@@ -196,42 +196,44 @@ a plain Python callable, exactly like LangChain's `@tool`. We chose MCP anyway, 
 
 The cost is a thin wrapper module and one IPC hop, invisible next to an HTTP call to trade.gov.
 
-### 3.3 · What Hermes wraps MCP in
+### 3.3 · Side by side
 
-Undocumented, found in `tools/mcp_tool.py`: prompt-injection scanning of tool descriptions, an
-OSV.dev malware preflight before spawning stdio servers, approval gating, and a filtered
-subprocess environment.
+| | Hermes | LangChain |
+|---|---|---|
+| **Define a tool** | `@mcp.tool()` (MCP) or `register_tool` (plugin) | `@tool` / `StructuredTool` |
+| **Schema from type hints** | yes, via MCP | yes |
+| **Bound to** | a toolset, reusable across agents | per agent, via `.bind_tools()` |
+| **MCP support** | first-class config key | `langchain-mcp-adapters` add-on package |
+| **Injection scan of tool descriptions** | yes | no equivalent |
+| **Malware preflight before spawning a server** | yes — OSV.dev | no equivalent |
+| **Filtered subprocess environment** | yes | n/a |
+| **Approval gating** | yes | no equivalent |
+
+**MCP is not a Hermes advantage** — LangChain supports it too. The difference is that it is a
+config key in one and an add-on package in the other, and that none of the security machinery in
+the lower half of that table has a LangChain equivalent out of the box. All four rows are
+undocumented; they are in `tools/mcp_tool.py`.
 
 > **A real gotcha.** That env filtering (`_build_safe_env()`) means an MCP subprocess does *not*
 > inherit your shell. Our `TRADE_GOV_API_KEY` silently arrived empty and the agent hallucinated
 > instead of calling the tool. Fix: explicit `${VAR}` passthrough in the server's `env:` block.
 > Good security default, sharp edge, no mention in the docs.
 
-**LangChain** uses the `@tool` decorator (or `StructuredTool`), bound per agent via
-`.bind_tools()`. Schema generation from type hints works the same way. MCP is supported via
-`langchain-mcp-adapters` (`MultiServerMCPClient`) — so **MCP is not a Hermes advantage**, though
-in Hermes it is a first-class config key rather than an add-on package, and none of the security
-machinery above has a LangChain equivalent out of the box.
-
 ---
 
 ## §4 · State and memory
 
-**Hermes** — four mechanisms, all built in, no external service:
-
-| | What | Cost |
+| What you need | Hermes | LangChain |
 |---|---|---|
-| `MEMORY.md` / `USER.md` | curated facts, injected at session start | grows the prompt permanently |
-| SQLite + FTS5 over the full transcript | `session_search`, **no LLM in the search path** | ~1.5K tokens/call for the tool |
-| Skills | procedural `SKILL.md` playbooks | loaded on relevance |
-| One optional external provider | 8 ship (Hindsight, Mem0, Honcho, …) | one `memory.provider` key, zero app code |
+| **History within a session** | automatic | a checkpointer you wire |
+| **Survives a restart** | automatic — SQLite `state.db` | `SqliteSaver` / `PostgresSaver` |
+| **Curated long-term facts** | `MEMORY.md` / `USER.md`, injected at session start | `langgraph.store` **+** a tool you write so the agent can save |
+| **Search past transcripts** | `session_search` — SQLite FTS5, **no LLM in the search path** | build it |
+| **Procedural playbooks** | Skills (`SKILL.md`) | no equivalent |
+| **Semantic / vector recall** | not by default | your choice of vector store |
+| **Hosted memory service** | one `memory.provider` key — 8 ship (Hindsight, Mem0, Honcho, …), zero app code | pick and wire your own |
 
-**LangChain** — deliberately separated, and you wire them:
-
-- **Short-term:** a LangGraph checkpointer (`InMemorySaver` → `SqliteSaver`/`PostgresSaver`)
-- **Long-term:** `langgraph.store` (`InMemoryStore` → `PostgresStore`), usually surfaced through a
-  tool you write so the agent can save and recall
-- `ConversationBufferMemory` and friends are deprecated (moved to `langchain-classic`)
+`ConversationBufferMemory` and friends are deprecated in LangChain (moved to `langchain-classic`).
 
 *Consequence:* Hermes gives persistence free but on its terms — a char cap on `MEMORY.md`, keyword
 rather than semantic search by default. LangChain gives no default and total choice, including
@@ -273,37 +275,44 @@ is 15 lines (§1) is precisely what makes 21,373 tokens look wrong rather than i
 
 ## §6 · Provider swap
 
-In this repo, swapping models is `MODEL=openrouter python run.py` — a different YAML overlay.
-**No code touched, no imports changed, no reinstall.** Agents and tools are provider-agnostic by
-construction.
+| | Hermes | LangChain |
+|---|---|---|
+| **What you change** | a YAML overlay | a line of code |
+| **How** | `MODEL=openrouter python run.py` | `init_chat_model("ollama:...")` |
+| **Install needed** | none | that provider's integration package |
+| **Redeploy** | no | yes |
+| **Agent or tool code touched** | none | none |
 
-LangChain's `init_chat_model("ollama:...")` is also ~one line — but it is a *code* change and
-needs that provider's integration package installed.
+Both are genuinely about one line. The difference is that one is config and one is code — which
+matters when the person switching models is not the person who can deploy.
 
-**The one-line swap is real in both. The assumption that behaviour is identical afterwards is
-not.** Measured here on Qwen3-32B: the two research tools never failed, but **delegation
-succeeded 4 times in 8** — a coin flip. The failure is specific and worth knowing: the model
-writes `delegate_task(goal="...")` as plain text in the `content` field instead of the structured
-`tool_calls` field. **A serialisation failure, not a reasoning failure** — it knew what to do and
-said it in the wrong box. Nested tool calls are where open-weight models break first, and no
-framework fixes that.
+> **The one-line swap is real in both. The assumption that behaviour is identical afterwards is
+> not.** Measured here on Qwen3-32B: the two research tools never failed, but **delegation
+> succeeded 4 times in 8** — a coin flip. The failure is specific: the model writes
+> `delegate_task(goal="...")` as plain text in the `content` field instead of the structured
+> `tool_calls` field. **A serialisation failure, not a reasoning failure** — it knew what to do and
+> said it in the wrong box. Nested tool calls are where open-weight models break first, and no
+> framework fixes that.
 
 ---
 
 ## §7 · Honest trade-offs
 
-**Where LangChain wins** — far larger ecosystem; arbitrary graph topologies, cycles and
-human-in-the-loop; it embeds inside your application instead of being the process; LangSmith for
-tracing and evaluation; a much bigger community and hiring pool.
+| Dimension | Hermes | LangChain | Better |
+|---|---|---|---|
+| **Control flow** | fixed ReAct loop + delegation | any graph — cycles, interrupts, human-in-the-loop | LangChain |
+| **Ecosystem** | MCP servers, 8 memory providers, plugins | retrievers, vector stores, hundreds of integrations | LangChain |
+| **Where it lives** | *is* the process | embeds inside your application | LangChain |
+| **Tracing / evaluation** | none built in | LangSmith | LangChain |
+| **Batteries** | memory, sessions, delegation, gateway — all present | you wire each one | Hermes |
+| **Provider swap** | config | code + install | Hermes |
+| **Deployment surface** | one runtime | an assembled stack | Hermes |
+| **MCP security** | injection scan, malware preflight, env filtering | none out of the box | Hermes |
+| **Sovereignty** | MIT, fully local, no required external service | possible, but your choice to assemble | Hermes |
+| **API stability** | pre-1.0 | agent API moved twice in ~a year | *neither* |
 
-**Where Hermes wins** — memory, delegation, sessions, MCP security and an OpenAI-compatible
-gateway all present without wiring; provider-agnostic by config; one deployment surface instead of
-an assembled stack; and a genuine sovereignty story — MIT, fully local, no required external
-service.
-
-**Where both are the same** — the loop is trivial and the surrounding twenty things are not. And
-neither is stable ground: LangChain has moved agent APIs twice in about a year (`AgentExecutor` →
-`create_react_agent` → `create_agent`, the first two deprecated), while Hermes is pre-1.0 and
+**On that last row** — this is the one people skip. LangChain went `AgentExecutor` →
+`create_react_agent` → `create_agent`, with the first two deprecated. Hermes is pre-1.0, and
 building this exercise found its published docs contradicting its own source in three places
 (`custom_providers` list-vs-dict, the MCP tool-name prefix, and the undocumented MCP security in
 §3.3). **Pin your versions and read the source, in either camp.**

@@ -12,7 +12,7 @@ hosted *or* open-weight models by changing one config line — not by rewriting 
 | **2** | Researcher → Writer handoff + long-term memory | ✅ `v2-handoff` |
 | **3** | Two open-weight models, no Anthropic, Dockerised | ✅ `v3-open-weight` |
 | — | [Hermes vs LangChain](docs/hermes-vs-langchain.md) — one page, presented live ([evidence](docs/hermes-vs-langchain-detail.md)) | ✅ |
-| — | [Performance notes](docs/performance.md) | ✅ |
+| — | [Performance notes](docs/performance.md) — model comparison ([detail](docs/performance-detail.md)) | ✅ |
 
 ---
 
@@ -53,19 +53,31 @@ compliance than almost anywhere else.
 
 ## Run it
 
-### Docker (everything, no Anthropic)
+### Docker — the whole workflow, no Anthropic
 
 ```bash
 cp .env.example .env      # add OPENROUTER_API_KEY and TRADE_GOV_API_KEY
 export $(grep -v '^#' .env | grep -v '^$' | xargs)
-MODEL=fast docker compose up --build
+
+MODEL=openrouter docker compose up --build     # Qwen3-32B, open weights, cloud endpoint
 ```
 
 Open **http://localhost:8000**.
 
-Three services: `gateway` (Hermes + this project's MCP tools), `app` (FastAPI relay + built React
-UI), and an optional `ollama` for the self-hosted path. For `MODEL=openrouter`/`fast` the model is
-a cloud API — only the Ollama path runs weights in a container.
+Two services start: `gateway` (Hermes + this project's MCP tools) and `app` (FastAPI relay +
+built React UI). Nothing Anthropic is involved at any point.
+
+**To run the model locally instead**, on your own weights:
+
+```bash
+docker compose --profile ollama up -d ollama
+docker compose exec ollama ollama pull qwen2.5:3b      # ~1.9 GB, once
+MODEL=ollama docker compose --profile ollama up --build
+```
+
+Ollama is behind a compose profile so it is only pulled when you ask for it. Expect it to be
+slow — see [performance notes](docs/performance.md) for measured numbers and the honest
+limitations of a 3B model on this task.
 
 > Stop any local `hermes gateway` / `uvicorn` first — they bind the same ports, and on macOS both
 > can hold them, so you cannot tell which one answered.

@@ -14,7 +14,7 @@
 model:
   provider: custom          # aliases: ollama, local, vllm, llamacpp
   default: qwen2.5:3b
-  base_url: http://localhost:11434/v1
+  base_url: "__OLLAMA_BASE_URL__"   # localhost locally; the compose service inside Docker
   key_env: OLLAMA_API_KEY   # any value; Ollama ignores it
   context_length: 65536
   ollama_num_ctx: 65536     # maps to extra_body.options.num_ctx

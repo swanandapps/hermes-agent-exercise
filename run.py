@@ -88,7 +88,14 @@ def _sync_profile(mode: str = "single") -> None:
     overlay_text = overlay_text.replace("__REPO_ROOT__", str(REPO_ROOT))
     project_overlay = yaml.safe_load(overlay_text)
 
-    model_overlay = yaml.safe_load(CONFIG.read_text())
+    # Ollama is reached at localhost when run on the host, and at the compose service name
+    # from inside a container. docker-compose.yml sets OLLAMA_BASE_URL; honour it here, or the
+    # containerised gateway points at itself and the self-hosted half of Part 3 cannot work.
+    model_text = CONFIG.read_text().replace(
+        "__OLLAMA_BASE_URL__",
+        os.environ.get("OLLAMA_BASE_URL", "http://localhost:11434/v1"),
+    )
+    model_overlay = yaml.safe_load(model_text)
 
     merged = _deep_merge(live_config, project_overlay)
     if mode == "handoff":

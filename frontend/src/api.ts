@@ -172,7 +172,19 @@ function handleFrame(frame: string, handlers: StreamHandlers): void {
 export type Verdict = "hit" | "review" | "cleared" | "nodata";
 
 export function verdictOf(text: string): Verdict | null {
-  const firstLine = text.trim().split("\n")[0] ?? "";
+  // Scan the first few non-empty lines, not just the first. The model often heads its
+  // answer ("## Screening Result") and puts the verdict on the next line — the verdict is
+  // still at the top, and dropping the chip there loses the one thing the page is for.
+  // Deliberately shallow: a verdict word further down is prose, not a verdict.
+  const firstLine =
+    text
+      .trim()
+      .split("\n")
+      .map((l) => l.trim())
+      .filter(Boolean)
+      .slice(0, 3)
+      .find((l) => /^[\s>#*_`-]*(hit|review|cleared|clear|no data|insufficient data|blocked|flagged|do not proceed|proceed|possible match|inconclusive|no match)\b/i.test(l)) ??
+    (text.trim().split("\n")[0] ?? "");
   // The model sometimes labels its opening line ("Direct answer: Cleared — …"),
   // so look past that prefix, but nowhere further: a verdict word buried mid-answer
   // is not a verdict. It also varies the wording — "Hit", "Hit found", "Blocked" —

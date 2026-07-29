@@ -100,26 +100,26 @@ PIDS+=($!)
 wait_for "http://127.0.0.1:$GATEWAY_PORT/health" "gateway  :$GATEWAY_PORT" 90
 
 # /health only says the gateway is listening. If the MCP server fails to start, Hermes
-# retries three times, PARKS it, and then serves happily with no tools at all — the agent
+# retries three times, PARKS it, and then serves happily with no tools registered — the agent
 # answers from its own knowledge and nothing on screen says the tools were missing.
 #
-# The retries back off 1s, 2s, 4s, so the give-up line lands ~7s after startup. Poll for it
-# rather than sleeping a guessed amount: a check that runs too early always passes, which is
-# worse than no check.
+# Those retries back off 1s/2s/4s and all happen while the gateway is still coming up, so the
+# give-up line is already in the log by the time /health answers: measured at t+9s for both.
+# A short grace window is therefore enough. The first version of this waited 15s on every
+# start, because it only broke out of the loop on failure — so a healthy run paid the full
+# timeout to learn nothing. Poll briefly, then believe it.
 MCP_FAIL='failed initial connection after|no valid toolsets configured|failed to start'
-tools_ok=1
-for _ in $(seq 1 15); do
-  if grep -qE "$MCP_FAIL" .logs/gateway.log 2>/dev/null; then tools_ok=0; break; fi
+for _ in $(seq 1 5); do
+  if grep -qE "$MCP_FAIL" .logs/gateway.log 2>/dev/null; then
+    echo ""
+    echo "✗ The trade-compliance MCP server did not register — the agent has NO TOOLS."
+    echo "  It will still answer, from training knowledge, and look plausible."
+    echo ""
+    grep -E "$MCP_FAIL" .logs/gateway.log | tail -2 | sed 's/^/    /'
+    exit 1
+  fi
   sleep 1
 done
-if (( tools_ok == 0 )); then
-  echo ""
-  echo "✗ The trade-compliance MCP server did not register — the agent has NO TOOLS."
-  echo "  It will still answer, from training knowledge, and look plausible."
-  echo ""
-  grep -E "$MCP_FAIL" .logs/gateway.log | tail -2 | sed 's/^/    /'
-  exit 1
-fi
 echo "  ✓ tools registered"
 
 # ── 2. the relay ─────────────────────────────────────────────────────────────

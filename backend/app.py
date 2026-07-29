@@ -2,7 +2,7 @@
 
 Its only jobs: keep the gateway API key server-side, and relay the Hermes gateway's
 SSE stream to the browser unchanged. All agent work — the ReAct loop, tool dispatch,
-delegation, memory — happens in the Hermes gateway, not here.
+tool dispatch — happens in the Hermes gateway, not here.
 
     uvicorn backend.app:app --reload --port 8000
 """
@@ -31,9 +31,9 @@ def _live_config() -> dict:
 
     Not from this process's own env vars: the backend and the gateway are separate
     processes, and `run.py` can re-sync the profile to a different provider without
-    the backend ever knowing. During the Part 3 demo the header is the only on-screen
-    evidence that the model really changed, so it has to read the same file the
-    gateway did — anything else can quietly disagree with reality.
+    the backend ever knowing. The header is the only on-screen evidence of which
+    model is really answering, so it has to read the same file the gateway did —
+    anything else can quietly disagree with reality.
     """
     if not PROFILE_CONFIG.exists():
         return {}
@@ -48,13 +48,9 @@ def get_config() -> dict:
     """What the header displays: the model and mode the gateway actually loaded."""
     cfg = _live_config()
     model = cfg.get("model") or {}
-    cli_toolsets = ((cfg.get("platform_toolsets") or {}).get("cli")) or []
     return {
         "model": model.get("default", "unknown"),
         "provider": model.get("provider", "unknown"),
-        # Handoff mode is defined by delegation being available, which is a fact
-        # about the loaded config rather than something we can assert from outside.
-        "mode": "handoff" if "delegation" in cli_toolsets else "single",
     }
 
 
@@ -77,7 +73,6 @@ async def chat(request: Request) -> StreamingResponse:
         "Content-Type": "application/json",
     }
     # Session continuity — the same id across turns keeps one Hermes session,
-    # which is what Part 2's long-term memory is scoped to.
     session_id = body.get("session_id")
     if session_id:
         headers["X-Hermes-Session-Id"] = session_id

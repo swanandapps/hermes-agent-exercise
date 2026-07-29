@@ -1,7 +1,6 @@
 # trade_tools/
 
-The Researcher's two tools, exposed to Hermes as a stdio **MCP server**. The Writer subagent gets
-none of them — it synthesises what the Researcher already gathered.
+The Researcher's two tools, exposed to Hermes as a stdio **MCP server**.
 
 | File | What it is |
 |---|---|

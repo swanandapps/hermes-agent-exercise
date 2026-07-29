@@ -72,7 +72,7 @@ export async function fetchConfig(): Promise<AppConfig> {
 }
 
 /** Strip the MCP namespace so the trace shows `screen_party`, not
- *  `mcp__trade_compliance__screen_party`. Non-MCP tools (delegate_task) pass through. */
+ *  `mcp__trade_compliance__screen_party`. Non-MCP tool names pass through unchanged. */
 export function toolLabel(raw: string): string {
   const parts = raw.split("__");
   return parts.length >= 3 ? parts.slice(2).join("__") : raw;
@@ -178,7 +178,6 @@ export function verdictOf(text: string): Verdict | null {
   // is not a verdict. It also varies the wording — "Hit", "Hit found", "Blocked" —
   // so match on the leading word, anchored, rather than one exact phrase.
   const head = firstLine.replace(/^direct answer:\s*/i, "").trimStart();
-  // Single mode: the Researcher answers directly. Handoff mode: the Writer's memo
   // opens with a deal-desk decision instead. Both vocabularies map to the same channels.
   if (/^(hit|blocked|flagged|do not proceed)\b/i.test(head)) return "hit";
   if (/^(cleared|clear|no match|proceed)\b/i.test(head)) return "cleared";

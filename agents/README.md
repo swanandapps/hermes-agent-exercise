@@ -1,33 +1,32 @@
 # agents/
 
-The two agents in this exercise. Both are built fresh here — nothing copied from another project.
+The Researcher's identity and configuration, kept in the repo rather than edited in place inside
+the Hermes profile directory.
 
-| | Role | Lives in |
-|---|---|---|
-| **researcher** | Gathers facts with the two MCP tools. Part 1's single agent; Part 2's orchestrator. | `researcher/SOUL.md`, `researcher/config.yaml` (+ `.handoff` variants) |
-| **writer** | Turns the Researcher's raw findings into a compliance memo. Part 2 only. | `writer/PERSONA.md` |
+| File | What it is |
+|---|---|
+| `researcher/SOUL.md` | Who the agent is, and the rules that hold whatever tools it has |
+| `researcher/config.yaml` | Which MCP server to launch, and which toolsets are exposed |
 
-## Why only one of them is a Hermes profile
+## How these reach Hermes
 
-Hermes reads exactly one identity file per profile: `$HERMES_HOME/SOUL.md`
-(`agent/prompt_builder.py:1841`). Subagents spawned with `delegate_task` don't get one — they
-start from a completely fresh conversation, and their entire identity arrives in the `goal` and
-`context` strings the parent passes. There is no parameter for pointing a child at a different
-profile or `SOUL.md`.
+Hermes reads exactly one identity file per profile — `$HERMES_HOME/SOUL.md`
+(`agent/prompt_builder.py:1841`) — plus that profile's `config.yaml`. Neither is read from this
+repo at runtime; `run.py` writes both into the active profile on every launch.
 
-So the Writer isn't a profile; it's a persona injected at delegation time. See
-[`writer/README.md`](writer/README.md) for how `PERSONA.md` gets there.
+That indirection buys two things. The identity is version-controlled next to the config it belongs
+with, and the config is **merged** rather than overwritten — Hermes's own defaults for
+compression, sessions and everything else survive untouched, so upgrading Hermes inherits its new
+defaults for free.
 
-## What's Hermes and what's ours
+## What belongs where
 
-Hermes only ever reads `SOUL.md` and `config.yaml` from the profile directory. Everything else
-here is this repo's own layout, resolved by `run.py` before it writes those two files:
+`SOUL.md` holds the standing rules: never answer from training knowledge, state failures
+explicitly, lead with the verdict word. Those hold true of any tool the agent is ever given.
 
-- `SOUL.md` / `config.yaml` — Part 1 (`--mode single`)
-- `SOUL.handoff.md` / `config.handoff.yaml` — Part 2 (`--mode handoff`), merged **on top of**
-  Part 1's rather than replacing it, so Part 1 keeps working untouched
-- `writer/PERSONA.md` — substituted into `SOUL.handoff.md` at the `__WRITER_PERSONA__` placeholder
+What an individual tool *does* is deliberately not here — it lives in that tool's docstring, which
+Hermes sends to the model as the tool description. Restating it in `SOUL.md` would mean two copies
+of one fact, and only one of them travels with the function it describes.
 
-The `model:` block comes from the overlay chosen by `MODEL` (see [`../config/`](../config/)), so
-the agents never hardcode a provider — that's what makes Part 3 a config change rather than a
-rewrite.
+`config.yaml` never names a provider. The model comes from `config/model.*.yaml`, merged on top at
+launch, which is what makes swapping models a config change rather than a code change.

@@ -20,11 +20,11 @@ and composable (and your responsibility) in LangChain.
 
 | File | Lines | What it is |
 |---|---|---|
-| `agents/researcher/SOUL.md` | 18 | Agent identity/behaviour — plain Markdown |
-| `agents/researcher/config.yaml` | 16 | MCP server registration + toolset exposure |
+| `agents/researcher/SOUL.md` | 31 | Agent identity/behaviour — plain Markdown |
+| `agents/researcher/config.yaml` | 39 | MCP server registration + toolset exposure |
 | `config/model.openai.yaml` | 9 | Provider/model block |
-| `trade_tools/trade_mcp/logic.py` | 136 | Our two tools' actual work (HTTP + normalisation) |
-| `trade_tools/trade_mcp/server.py` | 46 | MCP server — one `@mcp.tool()` wrapper each |
+| `trade_tools/trade_mcp/logic.py` | 139 | Our two tools' actual work (HTTP + normalisation) |
+| `trade_tools/trade_mcp/server.py` | 48 | MCP server — one `@mcp.tool()` wrapper each |
 | `run.py` | 106 | Config merge + launch. **Not agent logic.** |
 
 **Lines of agent-loop code written: zero.** No ReAct loop, no tool dispatch, no message history
@@ -121,9 +121,9 @@ total choice — including semantic/vector recall — which is more work and mor
 
 ## 4. The point that lands live
 
-**Provider swap.** In this repo, Part 3 is `MODEL=openrouter python run.py --mode single` —
-a different YAML overlay, **no code touched, no imports changed, no reinstall**. Agents, tools,
-memory, and delegation are provider-agnostic by construction.
+**Provider swap.** In this repo, swapping the model is `MODEL=openrouter python run.py` —
+a different YAML overlay, **no code touched, no imports changed, no reinstall**. Agents and tools
+are provider-agnostic by construction.
 
 LangChain's `init_chat_model("ollama:...")` is also ~one line — but it's a *code* change, needs
 that provider's integration package installed, and tool-calling reliability genuinely varies by

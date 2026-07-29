@@ -77,10 +77,46 @@ def fetch_screen_party(name: str) -> dict:
             "name": r.get("name") or "",
             "source_list": r.get("source") or "",
             "entity_type": r.get("type") or "",
+            "score": r.get("score"),
         }
         for r in results
     ]
-    return {"matched": True, "hits": hits}
+
+    # Screening runs with fuzzy_name=true, so a result set is not the same thing as a match:
+    # "Google" comes back with GORGE LIMITED and BESTOP GLOBLE MFG LIMITED at score 80, while
+    # "Rosneft Trading S.A." comes back at 100 with the name matching outright.
+    #
+    # The government computes that distinction and we used to discard it, leaving the agent to
+    # judge by eye whether GORGE LIMITED "looks like" Google. It reasoned it out correctly and
+    # still labelled the answer a HIT — a false positive dressed as a stop signal. Two of those
+    # in production and people stop believing the red ones.
+    #
+    # So the difference is reported, not inferred. An alias match still counts as exact: a party
+    # re-registering under an alt_name is precisely what these lists exist to catch.
+    query = name.strip().casefold()
+    exact_name_match = any(
+        (r.get("name") or "").strip().casefold() == query
+        or any((alt or "").strip().casefold() == query for alt in (r.get("alt_names") or []))
+        for r in results
+    )
+    scores = [r.get("score") for r in results if isinstance(r.get("score"), (int, float))]
+    top_score = max(scores) if scores else None
+    exact = exact_name_match or (top_score is not None and top_score >= 100)
+
+    result = {
+        "matched": True,
+        "match_quality": "exact" if exact else "partial",
+        "exact_name_match": exact_name_match,
+        "top_score": top_score,
+        "hits": hits,
+    }
+    if not exact:
+        result["note"] = (
+            f"No entry matches '{name}' outright — these are partial or phonetic similarities "
+            f"(best score {top_score}). Treat as REVIEW, not a confirmed hit, and re-screen with "
+            f"the exact legal entity name from the contract."
+        )
+    return result
 
 
 from pathlib import Path

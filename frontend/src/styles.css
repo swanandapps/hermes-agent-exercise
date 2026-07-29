@@ -235,6 +235,10 @@ body {
   background: var(--red-channel);
 }
 
+.verdict--review {
+  background: var(--amber);
+}
+
 .verdict--cleared {
   background: var(--green-channel);
 }

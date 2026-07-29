@@ -27,6 +27,7 @@ interface Exchange {
 
 const VERDICT_COPY: Record<Verdict, { label: string; channel: string }> = {
   hit: { label: "Hit found", channel: "Red channel" },
+  review: { label: "Needs review", channel: "Partial match" },
   cleared: { label: "Cleared", channel: "Green channel" },
   nodata: { label: "No data", channel: "Unresolved" },
 };

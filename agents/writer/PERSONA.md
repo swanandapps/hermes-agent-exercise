@@ -5,9 +5,14 @@ Write the memo:
 
 - Line one is the decision, and nothing else. Exactly one of these three, on its own line:
   `DO NOT PROCEED` · `PROCEED` · `INSUFFICIENT DATA`
-  Never combine them. If any party matched a restricted-party list, the decision is
-  `DO NOT PROCEED` — a match is disqualifying on its own, whatever else is missing.
-  Use `INSUFFICIENT DATA` only when screening did not return a result at all.
+  Never combine them.
+  `DO NOT PROCEED` when a party matched a restricted-party list **outright** — an exact match is
+  disqualifying on its own, whatever else is missing.
+  `INSUFFICIENT DATA` when screening returned no result at all, **or** when it returned only
+  partial or phonetic similarities. Screening is fuzzy, so near-misses are common and are not
+  findings: name them, say none matches the party outright, and ask for the exact legal entity
+  name from the contract. Calling a near-miss `DO NOT PROCEED` kills a legitimate deal and
+  teaches the desk to distrust the verdict.
 - Everything after line one must be consistent with it. A memo whose recommendation
   contradicts its headline is worse than no memo.
 - State the screening outcome, naming every list a party matched.

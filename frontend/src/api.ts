@@ -72,7 +72,7 @@ export async function fetchConfig(): Promise<AppConfig> {
 }
 
 /** Strip the MCP namespace so the trace shows `screen_party`, not
- *  `mcp__trade_compliance__screen_party`. Non-MCP tools (delegate_task) pass through. */
+ *  `mcp__trade_compliance__screen_party`. Non-MCP tool names pass through unchanged. */
 export function toolLabel(raw: string): string {
   const parts = raw.split("__");
   return parts.length >= 3 ? parts.slice(2).join("__") : raw;
@@ -169,7 +169,7 @@ function handleFrame(frame: string, handlers: StreamHandlers): void {
 /** The agent's system prompt mandates that findings open with one of these verdicts,
  *  so an exact leading match is reliable. Anything else renders without a verdict —
  *  showing the wrong one in a compliance tool is worse than showing none. */
-export type Verdict = "hit" | "cleared" | "nodata";
+export type Verdict = "hit" | "review" | "cleared" | "nodata";
 
 export function verdictOf(text: string): Verdict | null {
   const firstLine = text.trim().split("\n")[0] ?? "";
@@ -178,8 +178,10 @@ export function verdictOf(text: string): Verdict | null {
   // is not a verdict. It also varies the wording — "Hit", "Hit found", "Blocked" —
   // so match on the leading word, anchored, rather than one exact phrase.
   const head = firstLine.replace(/^direct answer:\s*/i, "").trimStart();
-  // Single mode: the Researcher answers directly. Handoff mode: the Writer's memo
   // opens with a deal-desk decision instead. Both vocabularies map to the same channels.
+  // REVIEW before HIT: screening is fuzzy, so most result sets are near-misses rather than
+  // matches, and colouring those red is how a red banner stops meaning anything.
+  if (/^(review|possible match|inconclusive)\b/i.test(head)) return "review";
   if (/^(hit|blocked|flagged|do not proceed)\b/i.test(head)) return "hit";
   if (/^(cleared|clear|no match|proceed)\b/i.test(head)) return "cleared";
   if (/^(no data|insufficient data)\b/i.test(head)) return "nodata";

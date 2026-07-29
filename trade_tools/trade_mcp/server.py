@@ -20,9 +20,11 @@ mcp = FastMCP("trade-compliance")
 def screen_party(name: str) -> dict:
     """Check whether a company or individual name appears on a US government restricted-party
     list (OFAC SDN, BIS Entity/Denied Persons, State Dept debarred parties, and others, combined).
-    Use this before any trade deal to confirm the counterparty is not sanctioned. Returns
-    matched=True with the matching list(s) if found, or matched=False with an explicit
-    "no matches found" message."""
+    Use this before any trade deal to confirm the counterparty is not sanctioned. Screening is
+    fuzzy, so results are not automatically matches: read `match_quality`. "exact" means an entry
+    matches the name outright — a confirmed hit. "partial" means only phonetic or partial
+    similarity (see `top_score` and `note`) and must be reported as REVIEW, never as a hit.
+    Returns matched=False with an explicit "no matches found" message when nothing came back."""
     return logic.fetch_screen_party(name=name)
 
 

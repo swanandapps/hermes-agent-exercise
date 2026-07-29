@@ -1,9 +1,7 @@
 # Hermes Agents vs LangChain Agents
 
-> Written against what this repo actually builds — a trade-compliance Researcher with real tools —
-> and what the same system would look like in LangChain. Hermes claims cite the installed runtime
-> (v0.18.2, MIT, Nous Research); LangChain claims verified against current docs, mid-2026. Token
-> and reliability figures are measured on this repo, not estimated.
+> Hermes claims cite the installed runtime (v0.18.2, MIT, Nous Research); LangChain claims are
+> verified against current docs, mid-2026. Token figures are measured, not estimated.
 
 **Hermes is a runtime you configure. LangChain is a library you assemble.**
 
@@ -38,8 +36,8 @@ everything *around* the agent.
 | Web API with streaming | included | write a server |
 | Where the agent lives | it **is** the process | sits inside your app |
 
-**For a two-tool demo, LangChain is less work.** This exercise asked for memory that outlives the
-session, a second agent and a model swap — which is exactly where the columns flip.
+**For a two-tool prototype, LangChain is less work.** Ask for memory that outlives the session, a
+second agent and a model swap, and the columns flip.
 
 ---
 
@@ -47,7 +45,7 @@ session, a second agent and a model swap — which is exactly where the columns 
 
 | If you are building | Reach for | Because |
 |---|---|---|
-| **An internal assistant a team talks to all day** — this compliance desk, an ops helper, a research aide | **Hermes** | It has to remember last week, run on your own hardware, and be reachable from Slack and a browser. All included; none of it is your code. |
+| **An internal assistant a team talks to all day** — an ops helper, a research aide, a compliance desk | **Hermes** | It has to remember last week, run on your own hardware, and be reachable from Slack and a browser. All included; none of it is your code. |
 | **A scheduled agent** — check something each morning, post the result to a channel | **Hermes** | Cron, messaging and sessions ship inside the same runtime. In LangChain each is a separate thing you host. |
 | **Anything that must stay on your own machines** — regulated data, no third-party service | **Hermes** | MIT, fully local, no external dependency by design. |
 | **A feature inside a product you already have** — a "summarise this ticket" button in your SaaS | **LangChain** | You need a library your app calls, not a second process running beside it. |
@@ -64,7 +62,7 @@ users arrive — retries, trimming long conversations, saving sessions, searchin
 what is worth remembering, handing work to a second agent.
 
 **A framework's defaults are the real cost.** Hermes switches on 49 tools by default, tuned for a
-general assistant. Cutting this agent down to the five it actually uses took the prompt from
+general assistant. Cutting an agent down to the five tools it actually uses took the prompt from
 **21,373 to 6,694 tokens per call** — and tool-calling got *more* reliable, because a model
 choosing between five options picks better than one choosing between 49.
 
@@ -81,10 +79,10 @@ choosing between five options picks better than one choosing between 49.
 > your own functions, and a framework will cost you more in defaults than it saves you in code.
 
 Both are MIT, and neither is settled ground. LangChain has changed its agent API twice in about a
-year (`AgentExecutor` → `create_react_agent` → `create_agent`), and Hermes is pre-1.0 — building
-this found its documentation contradicting its own source in three places. **Pin your versions and
-read the source, whichever you pick.**
+year (`AgentExecutor` → `create_react_agent` → `create_agent`), and Hermes is pre-1.0, with
+published documentation that contradicts its own source in more than one place. **Pin your
+versions and read the source, whichever you pick.**
 
-*Evidence — the fifteen-line loop written out, what a tool description actually contains, the three
-ways into Hermes and why this repo took the third, and where open-weight models break — is in
+*The same job written both ways — the loop by hand, a tool as a decorator, a plugin and an MCP
+server, memory, a second agent, the model swap — with code for each, is in
 [`hermes-vs-langchain-detail.md`](hermes-vs-langchain-detail.md).*

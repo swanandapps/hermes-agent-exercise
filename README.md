@@ -4,7 +4,8 @@
 > from-scratch agent loop, and not LangChain.
 
 An agent that answers pre-deal due-diligence questions using two real government data sources.
-Paired with a one-page architectural comparison: [Hermes vs LangChain](docs/hermes-vs-langchain.md).
+Paired with a one-page architectural comparison: [Hermes vs LangChain](docs/hermes-vs-langchain.md)
+(with the [evidence behind it](docs/hermes-vs-langchain-detail.md)).
 
 ---
 

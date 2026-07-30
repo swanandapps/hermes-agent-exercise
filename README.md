@@ -103,81 +103,86 @@ memory-hungry — read [performance notes](docs/performance.md) before trying it
 
 ## Run it
 
-### Docker — the whole workflow, no Anthropic
+### Step 1 — set up, once
 
 ```bash
-cp .env.example .env      # add OPENROUTER_API_KEY and TRADE_GOV_API_KEY
-export $(grep -v '^#' .env | grep -v '^$' | xargs)
+git clone https://github.com/swanandapps/hermes-agent-exercise.git
+cd hermes-agent-exercise
 
-MODEL=openrouter docker compose up --build     # Qwen3-32B, open weights, cloud endpoint
-```
-
-Open **http://localhost:8000**.
-
-Two services start: `gateway` (Hermes + this project's MCP tools) and `app` (FastAPI relay +
-built React UI). Nothing Anthropic is involved at any point.
-
-**To run the model locally instead**, on your own weights:
-
-```bash
-ollama pull qwen2.5:3b        # ~1.9 GB, once
-MODEL=ollama ./dev.sh         # then open http://localhost:5173
-```
-
-There is also an `ollama` compose profile, but native is the documented path: Docker Desktop's
-memory allowance is usually well below the machine's, and Ollama inside it cannot allocate the
-64 K context Hermes requires. See [performance notes](docs/performance.md) — measured numbers,
-why that happens, and the honest limits of a 3B model on this task.
-
-> Stop any local `hermes gateway` / `uvicorn` first — they bind the same ports, and on macOS both
-> can hold them, so you cannot tell which one answered.
-
-### Local
-
-```bash
 python -m venv .venv && . .venv/bin/activate
-pip install -r requirements.txt          # this project's dependencies
-pip install hermes-agent==0.19.0         # the runtime itself — see note below
+pip install -r requirements.txt      # this project's dependencies
+pip install hermes-agent==0.19.0     # the runtime itself
 hermes profile create hermes-exercise
 
-cp .env.example .env                     # add OPENROUTER_API_KEY and TRADE_GOV_API_KEY
-
-./dev.sh                        # Part 1 — gateway + relay + UI, one command
-./dev.sh handoff                # Part 2
-MODEL=ollama ./dev.sh           # Part 3, self-hosted
+cp .env.example .env                 # then put your two keys in it
+export $(grep -v '^#' .env | grep -v '^$' | xargs)
 ```
 
-> **Why Hermes is a separate install line.** It is deliberately not in `requirements.txt`.
-> Hermes provides the `hermes` command, and if it is pinned in this project's requirements then
-> re-running `pip install -r requirements.txt` can silently swap the runtime under a working
-> setup — including on a machine where Hermes was installed from git rather than PyPI. Keeping it
-> explicit means you always know which runtime you are on. Check with `hermes --version`.
+### Step 2 — run it
 
-Open **http://localhost:5173**. Ctrl-C stops all three.
+**Pick one.** Each is a single command.
 
-`dev.sh` re-syncs the Hermes profile before starting. That matters: the profile lives outside
-git, so switching branches does *not* update it, and demoing handoff against a stale single-mode
-profile fails silently.
+| Command | What runs | Open |
+|---|---|---|
+| `./dev.sh` | **Part 1** — one agent, three tools | http://localhost:5173 |
+| `./dev.sh handoff` | **Part 2** — Researcher → Writer + memory | http://localhost:5173 |
+| `MODEL=ollama ./dev.sh` | **Part 3** — local open-weight model | http://localhost:5173 |
+| `MODEL=openrouter docker compose up --build` | **Part 3** — everything in Docker, no Anthropic | http://localhost:8000 |
 
-For the CLI instead of the UI: `python run.py --mode single|handoff`.
+`./dev.sh` starts the Hermes gateway, the FastAPI relay and the React UI together, waits for each,
+and prints `✓ tools registered` when the agent can actually reach its tools. Ctrl-C stops all
+three.
+
+Then ask it something:
+
+> *We are signing a steel deal with Rosneft Trading S.A. Screen them and check Germany iron and
+> steel exports to the Russian Federation in 2022, then give me the memo.*
+
+### Terminal instead of a browser
+
+```bash
+python run.py --mode single      # Part 1
+python run.py --mode handoff     # Part 2
+```
+
+### For the local model (Part 3)
+
+```bash
+ollama pull qwen2.5:3b           # ~1.9 GB, once
+MODEL=ollama ./dev.sh
+```
+
+Expect ~50 seconds per answer and read [performance notes](docs/performance.md) first — a 3B
+model on 8 GB is a proof that the swap works, not a good demo. There is an `ollama` compose
+profile too, but native is the documented path: Docker Desktop's memory allowance is usually
+below what a 64 K context needs.
+
+### Two things that will bite you
+
+- **Stop any local `hermes gateway` / `uvicorn` before starting Docker.** They bind the same
+  ports, and on macOS both can hold them, so you cannot tell which one answered.
+- **The Hermes profile lives outside git** (`~/.hermes/profiles/hermes-exercise/`), so switching
+  branches does not update it. `dev.sh` re-syncs it on every start, which is why you should
+  launch through `dev.sh` rather than `hermes gateway` directly — a stale single-mode profile
+  makes handoff fail silently.
 
 ---
 
 ## The model swap is Part 3
 
 `MODEL` picks an overlay in [`config/`](config). Nothing else changes — no agent code, no tool
-code, no prompt:
+code, no prompt.
 
-```bash
-MODEL=fast       # qwen3.7-flash    ← recommended: fastest, cheapest, most reliable
-MODEL=openrouter # qwen3-32b
-MODEL=llama      # llama-3.1-8b
-MODEL=openai     # gpt-5-mini (hosted)
-MODEL=ollama     # local, self-hosted
-```
+| `MODEL=` | Model | Open weights? | Notes |
+|---|---|---|---|
+| `openrouter` | Qwen3-32B | **yes** | the Part 3 demo — unambiguously self-hostable |
+| `llama` | Llama-3.1-8B | **yes** | the second open model |
+| `ollama` | Qwen2.5-3B | **yes, and running locally** | the self-hosted proof |
+| `fast` | Qwen3.7-Flash | cloud-served | fastest and cheapest; the day-to-day default |
+| `openai` | GPT-5-mini | no | hosted baseline, for comparison only |
 
-Adding a model is a four-line YAML file. See [docs/performance.md](docs/performance.md) for
-measured latency, cost and reliability across them.
+Adding a model is a four-line YAML file. See [performance notes](docs/performance.md) for measured
+latency, cost and reliability across them — including where the smaller open models break.
 
 ---
 

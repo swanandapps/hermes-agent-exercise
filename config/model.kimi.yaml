@@ -1,0 +1,18 @@
+# Model overlay — OPEN-WEIGHT. Selected by MODEL=kimi.
+#
+#   MODEL=kimi ./dev.sh handoff
+#
+# Kimi K2 (Moonshot AI): a 1T-parameter mixture-of-experts with ~32B active, weights published on
+# HuggingFace under a Modified MIT licence. Built for agentic tool use, which is the workload here.
+#
+# The -0905 revision is chosen over plain kimi-k2 for one reason visible in OpenRouter's metadata:
+# it does not carry a thinking mode. On this agent that matters more than parameter count — a
+# reasoning model pays for hidden tokens on every one of the 4-5 calls in a turn.
+model:
+  provider: openrouter
+  default: moonshotai/kimi-k2-0905
+  key_env: OPENROUTER_API_KEY
+  context_length: 131072
+  # Hermes asks for 65,536 output tokens by default; OpenRouter reserves credit against that
+  # ceiling and refuses the request long before the answer costs anything like it.
+  max_tokens: 16384

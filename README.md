@@ -202,14 +202,15 @@ Everything below stands alone — read whichever question you actually have.
 `MODEL` picks an overlay in [`config/`](config). Nothing else changes — no agent code, no tool
 code, no prompt.
 
-| `MODEL=` | Model | Open weights? | Notes |
-|---|---|---|---|
-| `llama33` | Llama-3.3-70B | **yes** | **the Part 3 demo** — 38–56 s, delegates reliably |
-| `openrouter` | Qwen3-32B | **yes** | second open model. Correct, but ~127 s: a *thinking* model |
-| `ollama` | Qwen2.5-3B | **yes, running locally** | the self-hosted proof |
-| `llama` | Llama-3.1-8B | **yes** | kept because it *fails* at delegation — an instructive data point |
-| `fast` | Qwen3.7-Flash | not confirmed | quickest overall; not used for the Part 3 claim |
-| `openai` | GPT-5-mini | no | hosted baseline only |
+| `MODEL=` | Model | Vendor | Open weights? | Notes |
+|---|---|---|---|---|
+| `llama33` | Llama-3.3-70B | Meta | **yes** | **Part 3 model #1** — 38–56 s, delegates 3/3 |
+| `kimi` | Kimi K2 (0905) | Moonshot | **yes** | **Part 3 model #2** — 41–49 s, best memo of any model tested |
+| `ollama` | Qwen2.5-3B | Alibaba | **yes, running locally** | the self-hosted proof |
+| `openrouter` | Qwen3-32B | Alibaba | **yes** | kept as the *thinking-model* data point — correct, ~127 s |
+| `llama` | Llama-3.1-8B | Meta | **yes** | kept because it *fails* at delegation |
+| `fast` | Qwen3.7-Flash | Alibaba | not confirmed | quickest overall; does not carry the Part 3 claim |
+| `openai` | GPT-5-mini | OpenAI | no | hosted baseline only |
 
 Adding a model is a four-line YAML file. See [performance notes](docs/performance.md) for measured
 latency, cost and reliability across them — including where the smaller open models break.

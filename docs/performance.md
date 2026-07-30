@@ -11,14 +11,19 @@ That is the claim. This page is what happened when it was tested.
 
 ## The two open-weight models, and where each runs
 
-| | Model | Where it runs | Role |
-|---|---|---|---|
-| `MODEL=llama33` | **Llama-3.3-70B-Instruct** | OpenRouter (cloud endpoint) | **carries the live demo** — fastest that still delegates |
-| `MODEL=openrouter` | **Qwen3-32B** | OpenRouter (cloud endpoint) | the second open model, different family |
-| `MODEL=ollama` | **Qwen2.5-3B** | **Ollama, locally** | proves the self-hosted path |
-| `MODEL=llama` | Llama-3.1-8B-Instruct | OpenRouter | kept because it *fails* — see below |
-| `MODEL=fast` | Qwen3.7-Flash | OpenRouter | quickest overall, but published weights could not be confirmed, so it is not used for the Part 3 claim |
-| `MODEL=openai` | GPT-5-mini | OpenAI | hosted baseline, for comparison only |
+| | Model | Vendor | Where it runs | Role |
+|---|---|---|---|---|
+| `MODEL=llama33` | **Llama-3.3-70B-Instruct** | Meta | OpenRouter | **open-weight model #1** |
+| `MODEL=kimi` | **Kimi K2 (0905)** | Moonshot AI | OpenRouter | **open-weight model #2** |
+| `MODEL=ollama` | **Qwen2.5-3B** | Alibaba | **Ollama, locally** | proves the self-hosted path |
+| `MODEL=openrouter` | Qwen3-32B | Alibaba | OpenRouter | kept as the *thinking-model* data point — correct but ~127 s |
+| `MODEL=llama` | Llama-3.1-8B-Instruct | Meta | OpenRouter | kept because it *fails* at delegation |
+| `MODEL=fast` | Qwen3.7-Flash | Alibaba | OpenRouter | quickest overall, but published weights could not be confirmed, so it does not carry the Part 3 claim |
+| `MODEL=openai` | GPT-5-mini | OpenAI | OpenAI | hosted baseline, for comparison only |
+
+The two models carrying Part 3 are from **different vendors with independently published weights** —
+Llama 3.3 under Meta's community licence, Kimi K2 under a Modified MIT licence, both downloadable
+from HuggingFace.
 
 ### Which to demo, and why
 
@@ -26,10 +31,17 @@ Measured on the full handoff turn — screen a party, look up a trade lane, dele
 
 | Model | Turn | Delegated | Notes |
 |---|---|---|---|
-| **Llama-3.3-70B** | **38–56 s** | **3 / 3** | the recommendation |
+| **Kimi K2 (0905)** | **41–49 s** | **3 / 3** | best memo of any model tested — cites the lists, the figure, and an OFAC reporting step |
+| **Llama-3.3-70B** | **38–56 s** | **3 / 3** | leads with the decision, exactly as the prompt asks |
 | Qwen3-30B-A3B-Instruct | 17–23 s | **0 / 3** | fastest open model tried; writes `delegate_task` as plain text |
 | Qwen3-32B | 127 s | ✅ | correct, but a *thinking* model — reasoning tokens dominate the time |
 | Llama-3.1-8B | 21 s | ❌ | same failure as the 30B, at 8B |
+
+The two that work differ in one visible way. Llama opens with the decision. Kimi narrates first —
+*"I'll screen Rosneft Trading S.A. and look up the trade data"* — then produces the memo, which
+the Researcher's prompt asks it not to do. The content is better; the instruction-following is
+looser. Neither is wrong enough to matter here, but it is the kind of difference that only shows
+up when you read the output rather than check that it ran.
 
 Two things fall out of this, and neither is obvious from a model card:
 

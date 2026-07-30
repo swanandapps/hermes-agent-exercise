@@ -3,9 +3,25 @@
 > Built on the real **Nous Research Hermes** agent runtime (open source, MIT) — not a
 > from-scratch agent loop, and not LangChain.
 
-An agent that answers pre-deal due-diligence questions using two real government data sources.
-Paired with a one-page architectural comparison: [Hermes vs LangChain](docs/hermes-vs-langchain.md)
-(with the [evidence behind it](docs/hermes-vs-langchain-detail.md)).
+An agent that answers pre-deal due-diligence questions using real government data sources. Paired
+with a one-page architectural comparison: [Hermes vs LangChain](docs/hermes-vs-langchain.md)
+([PDF](docs/hermes-vs-langchain.pdf), [evidence behind it](docs/hermes-vs-langchain-detail.md)).
+
+> ### This branch is Part 1 only
+>
+> **Part 1 of the exercise** — one tool-using agent, plus the comparison document. No second
+> agent, no long-term memory, no Docker, no open-weight model overlays.
+>
+> The complete three-part system is on `main`:
+>
+> ```bash
+> git checkout main
+> ```
+>
+> Part 2 was added *alongside* this agent rather than changing it — `SOUL.md`, `config.yaml` and
+> everything under `trade_tools/` are **byte-identical** on both branches. That layering is what
+> makes this branch possible, and it means Part 1 still runs standalone with the full system built
+> on top of it.
 
 ---
 

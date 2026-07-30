@@ -13,12 +13,12 @@ That is the claim. This page is what happened when it was tested.
 
 | | Model | Vendor | Where it runs | Role |
 |---|---|---|---|---|
-| `MODEL=llama33` | **Llama-3.3-70B-Instruct** | Meta | OpenRouter | **open-weight model #1** |
-| `MODEL=kimi` | **Kimi K2 (0905)** | Moonshot AI | OpenRouter | **open-weight model #2** |
+| `MODEL=kimi` | **Kimi K2 (0905)** | Moonshot AI | OpenRouter | **open-weight model #1** — the most stable of these |
+| `MODEL=llama33` | **Llama-3.3-70B-Instruct** | Meta | OpenRouter | **open-weight model #2** — see *Which copy of the model* below |
 | `MODEL=ollama` | **Qwen2.5-3B** | Alibaba | **Ollama, locally** | proves the self-hosted path |
 | `MODEL=openrouter` | Qwen3-32B | Alibaba | OpenRouter | kept as the *thinking-model* data point — correct but ~127 s |
 | `MODEL=llama` | Llama-3.1-8B-Instruct | Meta | OpenRouter | kept because it *fails* at delegation |
-| `MODEL=fast` | Qwen3.7-Flash | Alibaba | OpenRouter | quickest overall, but published weights could not be confirmed, so it does not carry the Part 3 claim |
+| `MODEL=fast` | Qwen3.7-Flash | Alibaba | OpenRouter | quickest overall, but **not self-hostable** — see below. Kept for latency comparison only |
 | `MODEL=openai` | GPT-5-mini | OpenAI | OpenAI | hosted baseline, for comparison only |
 
 The two models carrying Part 3 are from **different vendors with independently published weights** —
@@ -32,7 +32,7 @@ Measured on the full handoff turn — screen a party, look up a trade lane, dele
 | Model | Turn | Delegated | Notes |
 |---|---|---|---|
 | **Kimi K2 (0905)** | **41–49 s** | **3 / 3** | best memo of any model tested — cites the lists, the figure, and an OFAC reporting step |
-| **Llama-3.3-70B** | **38–56 s** | **3 / 3** | leads with the decision, exactly as the prompt asks |
+| **Llama-3.3-70B** | **38–56 s** | **3 / 3** | leads with the decision, exactly as the prompt asks — but see the provider caveat below |
 | Qwen3-30B-A3B-Instruct | 17–23 s | **0 / 3** | fastest open model tried; writes `delegate_task` as plain text |
 | Qwen3-32B | 127 s | ✅ | correct, but a *thinking* model — reasoning tokens dominate the time |
 | Llama-3.1-8B | 21 s | ❌ | same failure as the 30B, at 8B |
@@ -55,9 +55,46 @@ structured call. A 30B model with 3B active parameters is fast and useful and st
 work to another agent. **70B is where that became reliable here** — so if a workflow depends on
 delegation, that is the number to test, not single tool calls.
 
-Both Qwen and Llama weights are downloadable and self-hostable. They are served here from a
-cloud endpoint because an 8 GB laptop cannot hold a useful model at Hermes's 64 K context floor —
-see *The local ceiling* below.
+Both Kimi and Llama weights are downloadable and self-hostable. They are served here from a cloud
+endpoint because an 8 GB laptop cannot hold a useful model at Hermes's 64 K context floor — see
+*The local ceiling* below.
+
+### Which copy of the model you get, and why it matters
+
+"Open weights" does not mean one model. OpenRouter routes each request to whichever provider is
+cheapest at that moment, and every provider runs its own copy — its own quantisation, its own
+serving stack. Three consecutive one-line requests to `llama-3.3-70b-instruct` were answered by
+**DeepInfra, AkashML and Cloudflare**.
+
+| Model | Providers | Quantisation |
+|---|---|---|
+| Llama-3.3-70B | **13** | mixed — **fp8** *and* bf16 |
+| Kimi K2 (0905) | 2 | Novita, Groq |
+| Qwen3.7-Flash | **1** | Alibaba only |
+
+That last row is the useful diagnostic, and it settles a question this page previously left open:
+**a model served by exactly one provider — its own vendor — is not self-hostable.** Nobody else
+can serve Qwen3.7-Flash because nobody else has the weights. It is fast and it is closed, so it
+does not carry the Part 3 claim.
+
+**The 13-provider row is a real operational hazard.** A turn makes 4–5 model calls, so it can be
+answered by several different copies of the "same" model. Running the Huawei query through
+Llama-3.3-70B on a fresh container, the output collapsed into token noise — mixed scripts, escaped
+fragments, no coherent sentence — and the tool trail showed the agent looping
+`screen_party → delegate → screen_party`. Same code and same prompt that had delegated 3/3 an hour
+earlier. **fp8 compression degrades structured output first, which is exactly what a tool call is.**
+
+Routing also dominates speed far more than model size does. Same prompt, same length of answer:
+
+| | Provider | Throughput |
+|---|---|---|
+| Kimi K2 | **Groq** | **82.9 tok/s** |
+| Llama-3.3-70B | DeepInfra | 9.5 tok/s |
+| Qwen2.5-3B | this laptop | 14.6 tok/s |
+
+**Nine times, from routing alone** — the smaller model on the faster provider beat the larger one
+by an order of magnitude. In production you would pin the provider rather than let a marketplace
+choose per call; here it is left unpinned because the variance is itself the finding.
 
 ## Running it
 
@@ -103,15 +140,19 @@ Same query on every model, same gateway, `--mode handoff`:
 > *"We are signing a steel deal with Rosneft Trading S.A. Screen them and check Germany iron and
 > steel exports to the Russian Federation in 2022, then give me the compliance memo."*
 
-| Model | Tools called | Handoff to Writer | Latency | Usable output |
-|---|---|---|---|---|
-| **Qwen3.7-Flash** (cloud) | ✅ both | ✅ | **5–25 s** | ✅ memo |
-| **Qwen3-32B** (cloud) | ✅ both | ✅ | 127.6 s | ✅ memo, looser wording |
-| **Llama-3.1-8B** (cloud) | ✅ both | ❌ **failed** | 21.0 s | ❌ raw JSON |
-| **Qwen2.5-3B** (local, Ollama, native) | ✅ | n/a | 46–154 s | ⚠️ contradicted itself |
-| GPT-5-mini (hosted, baseline) | ✅ both | ✅ | ~50 s | ✅ memo |
+| Model | Open weights | Tools called | Handoff to Writer | Latency | Usable output |
+|---|---|---|---|---|---|
+| **Kimi K2 (0905)** (cloud) | ✅ | ✅ both | ✅ 3/3 | **41–49 s** | ✅ best memo of the set |
+| **Llama-3.3-70B** (cloud) | ✅ | ✅ both | ✅ 3/3 | 38–56 s | ✅ memo — but see the provider caveat |
+| **Qwen3-32B** (cloud) | ✅ | ✅ both | ✅ | 127.6 s | ✅ memo, looser wording |
+| **Llama-3.1-8B** (cloud) | ✅ | ✅ both | ❌ **failed** | 21.0 s | ❌ raw JSON |
+| **Qwen2.5-3B** (local, Ollama, native) | ✅ | ✅ | ❌ failed | 46–154 s | ⚠️ contradicted itself |
+| Qwen3.7-Flash (cloud) | ❌ **Alibaba-only** | ✅ both | ✅ | **5–25 s** | ✅ memo — fastest, but closed |
+| GPT-5-mini (hosted, baseline) | ❌ | ✅ both | ✅ | ~50 s | ✅ memo |
 
-**Sample size is one run per model for the slower rows.** Directional findings, not benchmarks.
+**Sample size is one run per model for the slower rows.** Directional findings, not benchmarks —
+and, given the provider variance above, a result for a model name is really a result for whichever
+copy of it answered that day.
 
 ---
 

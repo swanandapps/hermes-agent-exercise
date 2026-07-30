@@ -84,28 +84,46 @@ Tested on an Apple M1 (8 GB), Node 22, with Hermes on Python 3.11.
 
 ## Run it
 
+### Step 1 — set up, once
+
 ```bash
+git clone -b part-1 https://github.com/swanandapps/hermes-agent-exercise.git
+cd hermes-agent-exercise
+
 python -m venv .venv && . .venv/bin/activate
-pip install -r requirements.txt          # this project's dependencies
-pip install hermes-agent==0.19.0         # the runtime itself
+pip install -r requirements.txt      # this project's dependencies
+pip install hermes-agent==0.19.0     # the runtime itself
 hermes profile create hermes-exercise
 
-cp .env.example .env      # add OPENROUTER_API_KEY and TRADE_GOV_API_KEY
+cp .env.example .env                 # then put your two keys in it
 export $(grep -v '^#' .env | grep -v '^$' | xargs)
-
-python run.py             # interactive CLI
 ```
 
-### With the web UI
+### Step 2 — run it
 
-```bash
-./dev.sh          # gateway + relay + UI, one command. Ctrl-C stops all three.
-```
+| Command | What you get | Open |
+|---|---|---|
+| `./dev.sh` | the agent with a web UI and a live audit trail | http://localhost:5173 |
+| `python run.py` | the same agent in the terminal | — |
 
-Open **http://localhost:5173**.
+`./dev.sh` starts the Hermes gateway, the FastAPI relay and the React UI together, waits for each,
+and prints `✓ tools registered` when the agent can actually reach its tools. Ctrl-C stops all
+three.
 
-The UI shows a live audit trail — every tool call, its arguments, how long it took, and the
-model's reasoning — so you can watch the agent decide rather than just read its answer.
+Then ask it something:
+
+> *Screen Rosneft Trading S.A. and check Germany iron and steel exports to the Russian Federation
+> in 2022.*
+
+The UI shows every tool call, its arguments, how long it took and the model's reasoning — so you
+can watch the agent decide rather than just read its answer. Try `Screen Siemens AG` for a clean
+result, and `Screen Google` for a partial match that is deliberately **not** reported as a hit.
+
+### One thing that will bite you
+
+The Hermes profile lives outside git (`~/.hermes/profiles/hermes-exercise/`), so switching
+branches does not update it. `dev.sh` re-syncs it on every start — which is why you should launch
+through `dev.sh` rather than calling `hermes gateway` directly.
 
 ---
 

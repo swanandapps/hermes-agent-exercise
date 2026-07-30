@@ -6,32 +6,35 @@
 A **single tool-using agent** that scales into a **two-agent collaborative workflow**, and runs on
 hosted *or* open-weight models by changing one config line — not by rewriting anything.
 
-**This branch (`main`) is the complete application — all three parts.**
+| Part | What it asked for | Delivered |
+|------|-------------------|-----------|
+| **1** | A single tool-using agent, and a one-page Hermes vs LangChain comparison | ✅ |
+| **2** | A two-agent workflow (Researcher → Writer) with memory across turns, Dockerised | ✅ |
+| **3** | Two open-weight self-hostable models, Ollama + a cloud endpoint, no Anthropic | ✅ |
 
-> ### Reviewing Part 1 on its own?
->
-> ```bash
-> git checkout part-1
-> ```
->
-> That branch is the single tool-using agent and the comparison document, and nothing else — no
-> second agent, no memory, no Docker, no open-weight overlays.
->
-> It is the same agent, not a cut-down copy: `SOUL.md`, `config.yaml` and everything under
-> `trade_tools/` are **byte-identical** on both branches. Part 2 was added *alongside* Part 1
-> rather than changing it, which is why the split is possible at all.
+## Which branch
 
-| Part | Requirement | Where |
-|------|-------------|-------|
-| **1** | Single tool-using agent | ✅ `main`, or the `part-1` branch on its own |
-| **2** | Researcher → Writer handoff + long-term memory | ✅ `main` |
-| **3** | Two open-weight models, no Anthropic, Dockerised | ✅ `main` |
-| — | [Hermes vs LangChain](docs/hermes-vs-langchain.md) — one page, presented live ([evidence](docs/hermes-vs-langchain-detail.md), [PDF](docs/hermes-vs-langchain.pdf)) | ✅ |
-| — | [Performance notes](docs/performance.md) — model comparison ([detail](docs/performance-detail.md)) | ✅ |
+| Branch | Contains | For |
+|---|---|---|
+| **`main`** | all three parts | the complete system |
+| **`part-1`** | Part 1 only — one agent + the comparison document. No second agent, no memory, no Docker, no open-weight overlays. | reviewing the single-agent deliverable on its own |
+
+```bash
+git checkout part-1     # Part 1 by itself
+git checkout main       # everything
+```
+
+`part-1` is not a cut-down copy. `SOUL.md`, `config.yaml` and everything under `trade_tools/` are
+**byte-identical** on both branches — Part 2 was added *alongside* Part 1 rather than changing it,
+which is what makes the split possible and what keeps the single-agent system independently
+runnable.
 
 The `v1-single` / `v2-handoff` / `v3-open-weight` tags mark when each part was finished. They are
-history, not the submission — a tag is frozen where it was placed, so those point at code from
-before several fixes. Read the branches.
+history, not the submission: a tag is frozen where it was placed, so those point at code from
+before several fixes. **Read the branches.**
+
+New here? [What it does](#what-it-does) → [Prerequisites](#prerequisites) → [Run it](#run-it) →
+[Documentation](#documentation).
 
 ---
 
@@ -165,6 +168,30 @@ below what a 64 K context needs.
   branches does not update it. `dev.sh` re-syncs it on every start, which is why you should
   launch through `dev.sh` rather than `hermes gateway` directly — a stale single-mode profile
   makes handoff fail silently.
+
+---
+
+## Documentation
+
+Everything below stands alone — read whichever question you actually have.
+
+### The deliverable documents
+
+| | Answers |
+|---|---|
+| **[Hermes vs LangChain](docs/hermes-vs-langchain.md)** · [PDF](docs/hermes-vs-langchain.pdf) | The one-page comparison, on the three dimensions the brief names: **architecture**, **tool definition**, **state management**. Ends with which framework to reach for given six concrete kinds of application — an internal assistant, a scheduled agent, a feature inside an existing product, document Q&A, a flow with approvals. |
+| **[Hermes vs LangChain — the code](docs/hermes-vs-langchain-detail.md)** | The same job written both ways, with code for each: the agent loop by hand, a tool as a decorator vs a plugin vs an MCP server, what a tool schema actually contains, memory, a second agent, swapping the model, serving it. |
+| **[Performance notes](docs/performance.md)** | Which two open-weight models, where each runs, and what changes: latency, cost per query, and the failure modes that are **not** errors — an 8B model that calls tools fine and then cannot delegate, a 32B one that is correct but looser, a 3B one that contradicts itself. Plus the resource ceiling: why 8 GB and a 64 K context floor rule out a bigger local model, measured. |
+| **[Prompt cost — working notes](docs/performance-detail.md)** | How the prompt went from **21,373 to 6,694 tokens per call**, what those tokens were made of, and the four optimisations that looked like wins and were reverted. |
+
+### The code, explained where it lives
+
+| | |
+|---|---|
+| [`agents/README.md`](agents/README.md) | How identity and config reach Hermes, and what belongs in `SOUL.md` versus a tool's own description |
+| [`trade_tools/README.md`](trade_tools/README.md) | Why the tools are an MCP server, and why a docstring is the thing that routes the model |
+| [`agents/researcher/SOUL.md`](agents/researcher/SOUL.md) | The agent's actual instructions — worth reading, it is short |
+| [`agents/writer/PERSONA.md`](agents/writer/PERSONA.md) | The Writer subagent's identity, injected at delegation time |
 
 ---
 

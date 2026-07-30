@@ -6,13 +6,32 @@
 A **single tool-using agent** that scales into a **two-agent collaborative workflow**, and runs on
 hosted *or* open-weight models by changing one config line — not by rewriting anything.
 
-| Part | Requirement | Status |
-|------|-------------|--------|
-| **1** | Single tool-using agent | ✅ `v1-single` |
-| **2** | Researcher → Writer handoff + long-term memory | ✅ `v2-handoff` |
-| **3** | Two open-weight models, no Anthropic, Dockerised | ✅ `v3-open-weight` |
-| — | [Hermes vs LangChain](docs/hermes-vs-langchain.md) — one page, presented live ([evidence](docs/hermes-vs-langchain-detail.md)) | ✅ |
+**This branch (`main`) is the complete application — all three parts.**
+
+> ### Reviewing Part 1 on its own?
+>
+> ```bash
+> git checkout part-1
+> ```
+>
+> That branch is the single tool-using agent and the comparison document, and nothing else — no
+> second agent, no memory, no Docker, no open-weight overlays.
+>
+> It is the same agent, not a cut-down copy: `SOUL.md`, `config.yaml` and everything under
+> `trade_tools/` are **byte-identical** on both branches. Part 2 was added *alongside* Part 1
+> rather than changing it, which is why the split is possible at all.
+
+| Part | Requirement | Where |
+|------|-------------|-------|
+| **1** | Single tool-using agent | ✅ `main`, or the `part-1` branch on its own |
+| **2** | Researcher → Writer handoff + long-term memory | ✅ `main` |
+| **3** | Two open-weight models, no Anthropic, Dockerised | ✅ `main` |
+| — | [Hermes vs LangChain](docs/hermes-vs-langchain.md) — one page, presented live ([evidence](docs/hermes-vs-langchain-detail.md), [PDF](docs/hermes-vs-langchain.pdf)) | ✅ |
 | — | [Performance notes](docs/performance.md) — model comparison ([detail](docs/performance-detail.md)) | ✅ |
+
+The `v1-single` / `v2-handoff` / `v3-open-weight` tags mark when each part was finished. They are
+history, not the submission — a tag is frozen where it was placed, so those point at code from
+before several fixes. Read the branches.
 
 ---
 

@@ -118,8 +118,10 @@ pip install hermes-agent==0.19.0     # the runtime itself
 hermes profile create hermes-exercise
 
 cp .env.example .env                 # then put your two keys in it
-export $(grep -v '^#' .env | grep -v '^$' | xargs)
 ```
+
+Nothing needs to be exported. `dev.sh` sources `.env` itself, and Docker Compose reads it
+automatically — so the keys reach both paths from that one file.
 
 ### Step 2 — run it
 

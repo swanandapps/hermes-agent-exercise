@@ -3,25 +3,24 @@
 > Built on the real **Nous Research Hermes** agent runtime (open source, MIT) — not a
 > from-scratch agent loop, and not LangChain.
 
-An agent that answers pre-deal due-diligence questions using real government data sources. Paired
-with a one-page architectural comparison: [Hermes vs LangChain](docs/hermes-vs-langchain.md)
-([PDF](docs/hermes-vs-langchain.pdf), [evidence behind it](docs/hermes-vs-langchain-detail.md)).
+An agent that answers pre-deal due-diligence questions using real government data sources.
 
-> ### This branch is Part 1 only
->
-> **Part 1 of the exercise** — one tool-using agent, plus the comparison document. No second
-> agent, no long-term memory, no Docker, no open-weight model overlays.
->
-> The complete three-part system is on `main`:
->
-> ```bash
-> git checkout main
-> ```
->
-> Part 2 was added *alongside* this agent rather than changing it — `SOUL.md`, `config.yaml` and
-> everything under `trade_tools/` are **byte-identical** on both branches. That layering is what
-> makes this branch possible, and it means Part 1 still runs standalone with the full system built
-> on top of it.
+## Which branch
+
+**This is `part-1` — Part 1 of the exercise, on its own.** One tool-using agent plus the
+one-page Hermes vs LangChain comparison. No second agent, no long-term memory, no Docker, no
+open-weight model overlays.
+
+```bash
+git checkout main     # the complete three-part system
+```
+
+It is not a cut-down copy: `SOUL.md`, `config.yaml` and everything under `trade_tools/` are
+**byte-identical** on both branches. Part 2 was added *alongside* this agent rather than changing
+it, which is what keeps the single-agent system independently runnable with the rest built on top.
+
+New here? [What it does](#what-it-does) → [Prerequisites](#prerequisites) → [Run it](#run-it) →
+[Documentation](#documentation).
 
 ---
 
@@ -124,6 +123,18 @@ result, and `Screen Google` for a partial match that is deliberately **not** rep
 The Hermes profile lives outside git (`~/.hermes/profiles/hermes-exercise/`), so switching
 branches does not update it. `dev.sh` re-syncs it on every start — which is why you should launch
 through `dev.sh` rather than calling `hermes gateway` directly.
+
+---
+
+## Documentation
+
+| | Answers |
+|---|---|
+| **[Hermes vs LangChain](docs/hermes-vs-langchain.md)** · [PDF](docs/hermes-vs-langchain.pdf) | The one-page comparison, on the three dimensions the brief names: **architecture**, **tool definition**, **state management**. Ends with which framework to reach for given six concrete kinds of application. |
+| **[Hermes vs LangChain — the code](docs/hermes-vs-langchain-detail.md)** | The same job written both ways, with code: the agent loop by hand, a tool as a decorator vs a plugin vs an MCP server, what a tool schema actually contains, memory, a second agent, swapping the model. |
+| [`agents/README.md`](agents/README.md) | How identity and config reach Hermes, and what belongs in `SOUL.md` versus a tool's own description |
+| [`trade_tools/README.md`](trade_tools/README.md) | Why the tools are an MCP server, and why a docstring is what routes the model |
+| [`agents/researcher/SOUL.md`](agents/researcher/SOUL.md) | The agent's actual instructions — worth reading, it is short |
 
 ---
 

@@ -1,0 +1,26 @@
+# Model overlay — OPEN-WEIGHT, the recommended Part 3 demo. Selected by MODEL=llama33.
+#
+#   MODEL=llama33 ./dev.sh handoff
+#
+# Llama-3.3-70B-Instruct: weights are published and self-hostable, the family is named in the
+# exercise brief, and it is the fastest model measured here that still delegates reliably.
+#
+# Measured on the full handoff turn (screen + trade lookup + delegate to the Writer):
+#
+#   llama-3.3-70b-instruct    38-56 s   delegated 3/3   <- this file
+#   qwen3-32b                    127 s   delegated       thinking tokens dominate the time
+#   qwen3-30b-a3b-instruct     17-23 s   delegated 0/3   fast, but writes delegate_task as text
+#   llama-3.1-8b-instruct         21 s   delegated 0/1   same failure, at 8B
+#
+# The pattern: on this workload, models WITHOUT a thinking mode are far quicker, and nested tool
+# calls — an agent delegating to another agent — are where the smaller ones break first. 70B is
+# where delegation became reliable without paying for reasoning tokens.
+model:
+  provider: openrouter
+  default: meta-llama/llama-3.3-70b-instruct
+  key_env: OPENROUTER_API_KEY
+  context_length: 131072
+  # Same reason as the other OpenRouter overlays: Hermes asks for 65,536 output tokens by
+  # default, OpenRouter reserves credit against that ceiling, and the request is refused for
+  # insufficient credit long before the answer costs anything like it.
+  max_tokens: 16384

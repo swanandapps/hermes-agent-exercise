@@ -204,11 +204,12 @@ code, no prompt.
 
 | `MODEL=` | Model | Open weights? | Notes |
 |---|---|---|---|
-| `openrouter` | Qwen3-32B | **yes** | the Part 3 demo — unambiguously self-hostable |
-| `llama` | Llama-3.1-8B | **yes** | the second open model |
-| `ollama` | Qwen2.5-3B | **yes, and running locally** | the self-hosted proof |
-| `fast` | Qwen3.7-Flash | cloud-served | fastest and cheapest; the day-to-day default |
-| `openai` | GPT-5-mini | no | hosted baseline, for comparison only |
+| `llama33` | Llama-3.3-70B | **yes** | **the Part 3 demo** — 38–56 s, delegates reliably |
+| `openrouter` | Qwen3-32B | **yes** | second open model. Correct, but ~127 s: a *thinking* model |
+| `ollama` | Qwen2.5-3B | **yes, running locally** | the self-hosted proof |
+| `llama` | Llama-3.1-8B | **yes** | kept because it *fails* at delegation — an instructive data point |
+| `fast` | Qwen3.7-Flash | not confirmed | quickest overall; not used for the Part 3 claim |
+| `openai` | GPT-5-mini | no | hosted baseline only |
 
 Adding a model is a four-line YAML file. See [performance notes](docs/performance.md) for measured
 latency, cost and reliability across them — including where the smaller open models break.

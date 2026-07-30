@@ -13,11 +13,35 @@ That is the claim. This page is what happened when it was tested.
 
 | | Model | Where it runs | Role |
 |---|---|---|---|
-| `MODEL=openrouter` | **Qwen3-32B** | OpenRouter (cloud endpoint) | carries the live demo |
-| `MODEL=llama` | **Llama-3.1-8B-Instruct** | OpenRouter (cloud endpoint) | the second open model |
+| `MODEL=llama33` | **Llama-3.3-70B-Instruct** | OpenRouter (cloud endpoint) | **carries the live demo** — fastest that still delegates |
+| `MODEL=openrouter` | **Qwen3-32B** | OpenRouter (cloud endpoint) | the second open model, different family |
 | `MODEL=ollama` | **Qwen2.5-3B** | **Ollama, locally** | proves the self-hosted path |
-| `MODEL=fast` | Qwen3.7-Flash | OpenRouter | fastest of the Qwen family; the default |
+| `MODEL=llama` | Llama-3.1-8B-Instruct | OpenRouter | kept because it *fails* — see below |
+| `MODEL=fast` | Qwen3.7-Flash | OpenRouter | quickest overall, but published weights could not be confirmed, so it is not used for the Part 3 claim |
 | `MODEL=openai` | GPT-5-mini | OpenAI | hosted baseline, for comparison only |
+
+### Which to demo, and why
+
+Measured on the full handoff turn — screen a party, look up a trade lane, delegate the memo:
+
+| Model | Turn | Delegated | Notes |
+|---|---|---|---|
+| **Llama-3.3-70B** | **38–56 s** | **3 / 3** | the recommendation |
+| Qwen3-30B-A3B-Instruct | 17–23 s | **0 / 3** | fastest open model tried; writes `delegate_task` as plain text |
+| Qwen3-32B | 127 s | ✅ | correct, but a *thinking* model — reasoning tokens dominate the time |
+| Llama-3.1-8B | 21 s | ❌ | same failure as the 30B, at 8B |
+
+Two things fall out of this, and neither is obvious from a model card:
+
+**Thinking modes cost more than parameters do.** Qwen3-32B is smaller than Llama-3.3-70B and took
+**three times longer**, because it generates reasoning tokens on every one of the 4–5 calls in a
+turn. For an agent workload, "no thinking mode" is a bigger speed lever than parameter count.
+
+**Nested tool calls are a separate capability from tool calls.** Both models that failed called
+`screen_party` and `trade_data_lookup` perfectly, then wrote the delegation as prose instead of a
+structured call. A 30B model with 3B active parameters is fast and useful and still cannot hand
+work to another agent. **70B is where that became reliable here** — so if a workflow depends on
+delegation, that is the number to test, not single tool calls.
 
 Both Qwen and Llama weights are downloadable and self-hostable. They are served here from a
 cloud endpoint because an 8 GB laptop cannot hold a useful model at Hermes's 64 K context floor —

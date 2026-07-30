@@ -54,14 +54,43 @@ compliance than almost anywhere else.
 
 ---
 
+## Prerequisites
+
+| | Needed for | Notes |
+|---|---|---|
+| **Python 3.11–3.13** | everything | the floor is `hermes-agent`'s, not this project's — it declares `>=3.11,<3.14` |
+| **Node 18+ / npm** | the web UI | Vite 5; skip it if you only want the CLI |
+| **`hermes-agent`** | everything | the runtime. Installed separately — see below |
+
+**Two API keys**, both free:
+
+| Key | Where | Used for |
+|---|---|---|
+| `TRADE_GOV_API_KEY` | the trade.gov developer portal, for the [Consolidated Screening List API](https://data.trade.gov) | sanctions screening — **required** |
+| `OPENROUTER_API_KEY` | [openrouter.ai/keys](https://openrouter.ai/keys) | the model. A few dollars of credit is plenty |
+
+The trade.gov key is sent as a `subscription-key` header, so it is the one issued by their own
+developer portal for that API — not a generic api.data.gov key.
+
+`OPENAI_API_KEY` is optional and only used by `MODEL=openai`. Nothing here needs an Anthropic key.
+
+Tested on an Apple M1 (8 GB), Node 22, with Hermes on Python 3.11.
+
+> Hermes and this project do not have to share an interpreter: `hermes` only needs to be on
+> `PATH`, and the MCP tool server is launched with whichever Python `run.py` is running under.
+> A single 3.11–3.13 virtualenv for both is simplest, and that is what the steps below assume.
+
+---
+
 ## Run it
 
 ```bash
 python -m venv .venv && . .venv/bin/activate
-pip install -r requirements.txt
+pip install -r requirements.txt          # this project's dependencies
+pip install hermes-agent==0.19.0         # the runtime itself
 hermes profile create hermes-exercise
 
-cp .env.example .env      # add OPENAI_API_KEY (or OPENROUTER_API_KEY) and TRADE_GOV_API_KEY
+cp .env.example .env      # add OPENROUTER_API_KEY and TRADE_GOV_API_KEY
 export $(grep -v '^#' .env | grep -v '^$' | xargs)
 
 python run.py             # interactive CLI

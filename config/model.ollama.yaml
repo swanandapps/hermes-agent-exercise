@@ -1,16 +1,20 @@
 # Model overlay — OPEN-WEIGHT, SELF-HOSTED locally via Ollama. Selected by MODEL=ollama.
-# This is the "self-hostable" half of Part 3; config/model.openrouter.yaml is the cloud half.
+# This is the "self-hostable" half of Part 3; the OpenRouter overlays are the cloud half.
 #
-#   ollama pull qwen2.5:3b
-#   MODEL=ollama python run.py --mode single
+#   ollama pull qwen2.5:3b      # ~1.9 GB, once
+#   MODEL=ollama ./dev.sh handoff
 #
-# Hermes enforces a 64K minimum context (agent/model_metadata.py: MINIMUM_CONTEXT_LENGTH) and it
-# checks the context Ollama ACTUALLY loaded, not what we declare here — so ollama_num_ctx must be
-# 65536 as well. There is no way to satisfy the floor while quietly allocating a smaller window.
+# Whatever is named here MUST already be pulled. Ollama does not fetch on demand — it answers
+# `HTTP 404: model not found`, and it does so at the first query rather than at startup, so the
+# gateway comes up green and fails only once someone asks it something.
 #
-# On an 8GB machine that, not the weights, is the binding constraint: qwen2.5:3b is only 1.9GB, but
-# a 64K KV cache on top of it is what exhausts memory. See docs/performance.md for what actually
-# happened when this was run.
+# Hermes enforces a 64K minimum context (agent/model_metadata.py: MINIMUM_CONTEXT_LENGTH) and
+# checks the window Ollama ACTUALLY loaded, not what is declared here — so ollama_num_ctx must be
+# 65536 too. There is no way to satisfy the floor while quietly allocating less; both were tried.
+#
+# On an 8GB machine that KV cache, not the weights, is the binding constraint: this model is
+# 1.9GB of weights but ~4.1GB resident once a 64K window is allocated, leaving ~120MB free.
+# qwen2.5:7b (4.7GB) timed out entirely. See docs/performance.md for what it can and cannot do.
 model:
   provider: custom          # aliases: ollama, local, vllm, llamacpp
   default: qwen2.5:3b

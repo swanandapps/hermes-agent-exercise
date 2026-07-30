@@ -122,14 +122,54 @@ turn, not the size of any one prompt.
 
 ## The local ceiling
 
-Hermes enforces a hard **64 K context floor** (`agent/model_metadata.py`:
-`MINIMUM_CONTEXT_LENGTH`), and checks what Ollama actually loaded rather than what the config
-declares — so `ollama_num_ctx: 65536` is mandatory, and there is no way to satisfy the floor
-while quietly allocating less.
+Measured on an **Apple M1, 8 GB RAM, 8 cores**. Everything below is specific to that; a 16 GB
+machine changes the answers.
 
-On an 8 GB machine that KV cache, not the weights, is the binding constraint: Qwen2.5-3B is
-1.9 GB of weights but ~4.1 GB resident once a 64 K window is allocated, leaving ~120 MB free.
-A 7B model at the same context timed out entirely.
+Hermes requires a **64 K context** (`agent/model_metadata.py`: `MINIMUM_CONTEXT_LENGTH`), and the
+**KV cache for that window — not the weights — is the binding constraint**:
+
+| | Weights | Resident at 64 K | Result |
+|---|---|---|---|
+| Qwen2.5-3B | 1.9 GB | **~4.1 GB** | runs; ~120 MB free; 46–62 s per turn |
+| Qwen2.5-7B | 4.7 GB | — | timed out at 64 K |
+
+The weights are the smaller half of the bill. A 3B model more than doubles its footprint once a
+64 K window is allocated.
+
+### Why not just use a smaller context window?
+
+The obvious move, and it does not work — tested rather than assumed. Our prompt is only ~2,700
+tokens, so 16 K would be ample, and at 16 K the same 3B model answers coherently in seconds.
+
+Hermes refuses:
+
+```
+runtime_context=32768  minimum_context=64000  →  turn refused
+```
+
+Two separate checks enforce it. `model.context_length` below 64,000 is rejected outright, and
+`agent/conversation_loop.py` then probes the context Ollama **actually loaded** and refuses if
+that is short — so declaring 64 K while quietly serving less does not work either. (A third check
+in `cli.py` only warns, which is misleading if that is the one you find first.)
+
+Raising the ceiling by shrinking the window is therefore not available. The floor is deliberate:
+tool schemas plus system prompt are a large fixed prefix, and Hermes would rather refuse than
+silently truncate them.
+
+### Why not a bigger model, then?
+
+Qwen2.5-7B at 16 K produced a noticeably better sentence — and took **2 minutes 8 seconds**,
+leaving 95 MB free. Correct, and unusable for a demo. The quality ceiling and the memory ceiling
+are the same ceiling on this machine.
+
+### What a memory-starved 3B actually does
+
+Not an error. On one run the tool call **succeeded** and the model reported:
+
+> *"There seems to have been an issue with the screening API. I will try running the test again."*
+
+That is the failure mode worth knowing about: the data was correct and the model narrated a
+failure that never happened.
 
 So the split is deliberate, and worth stating as two separate claims:
 

@@ -99,7 +99,7 @@ choose per call; here it is left unpinned because the variance is itself the fin
 ## Running it
 
 ```bash
-cp .env.example .env          # OPENROUTER_API_KEY + TRADE_GOV_API_KEY
+cp .env.example .env          # add OPENROUTER_API_KEY; the trade.gov key is already in it
 export $(grep -v '^#' .env | grep -v '^$' | xargs)
 
 # cloud open-weight model, whole stack in Docker, no Anthropic

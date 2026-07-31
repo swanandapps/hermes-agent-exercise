@@ -83,17 +83,23 @@ compliance than almost anywhere else.
 | **Docker Desktop** | the Dockerised path | not needed for local runs |
 | **Ollama** | the self-hosted model only | [ollama.com](https://ollama.com); not needed otherwise |
 
-**Two API keys**, both free:
+**One API key to add.** The other is already in `.env.example`:
 
-| Key | Where | Used for |
+| Key | Status | Used for |
 |---|---|---|
-| `TRADE_GOV_API_KEY` | the trade.gov developer portal, for the [Consolidated Screening List API](https://data.trade.gov) | sanctions screening — **required** |
-| `OPENROUTER_API_KEY` | [openrouter.ai/keys](https://openrouter.ai/keys) | the model. A few dollars of credit is plenty |
+| `OPENROUTER_API_KEY` | **yours to add** — [openrouter.ai/keys](https://openrouter.ai/keys) | the model. A few dollars of credit is plenty. Not needed for `MODEL=ollama` |
+| `TRADE_GOV_API_KEY` | **already filled in** | sanctions screening, via the [Consolidated Screening List API](https://data.trade.gov) |
 
-The trade.gov key is sent as a `subscription-key` header, so it is the one issued by their own
-developer portal for that API — not a generic api.data.gov key.
+A working trade.gov key is committed to `.env.example` deliberately, so that setting this up is
+one key and not two. It is free, read-only and not billable — it buys queries against a public
+government list and nothing else, with no account or spend behind it. Keys that cost money or
+carry an identity are left empty, which is the distinction being drawn rather than ignored. Get
+your own from the trade.gov developer portal if you would rather; it is sent as a
+`subscription-key` header, so it must be issued by that portal, not a generic api.data.gov key.
 
-`OPENAI_API_KEY` is optional and only used by `MODEL=openai`. Nothing here needs an Anthropic key.
+`OPENAI_API_KEY` is optional and only used by `MODEL=openai` — and even that is a convenience
+rather than a requirement, since OpenRouter serves OpenAI models too. Nothing here needs an
+Anthropic key.
 
 Tested on an Apple M1 (8 GB), Node 22, with Hermes on Python 3.11. The self-hosted model path is
 memory-hungry — read [performance notes](docs/performance.md) before trying it on 8 GB.
@@ -117,7 +123,7 @@ pip install -r requirements.txt      # this project's dependencies
 pip install hermes-agent==0.19.0     # the runtime itself
 hermes profile create hermes-exercise
 
-cp .env.example .env                 # then put your two keys in it
+cp .env.example .env                 # then add your OpenRouter key
 ```
 
 Nothing needs to be exported. `dev.sh` sources `.env` itself, and Docker Compose reads it

@@ -61,15 +61,19 @@ compliance than almost anywhere else.
 | **Node 18+ / npm** | the web UI | Vite 5; skip it if you only want the CLI |
 | **`hermes-agent`** | everything | the runtime. Installed separately — see below |
 
-**Two API keys**, both free:
+**One API key to add.** The other is already in `.env.example`:
 
-| Key | Where | Used for |
+| Key | Status | Used for |
 |---|---|---|
-| `TRADE_GOV_API_KEY` | the trade.gov developer portal, for the [Consolidated Screening List API](https://data.trade.gov) | sanctions screening — **required** |
-| `OPENROUTER_API_KEY` | [openrouter.ai/keys](https://openrouter.ai/keys) | the model. A few dollars of credit is plenty |
+| `OPENROUTER_API_KEY` | **yours to add** — [openrouter.ai/keys](https://openrouter.ai/keys) | the model. A few dollars of credit is plenty |
+| `TRADE_GOV_API_KEY` | **already filled in** | sanctions screening, via the [Consolidated Screening List API](https://data.trade.gov) |
 
-The trade.gov key is sent as a `subscription-key` header, so it is the one issued by their own
-developer portal for that API — not a generic api.data.gov key.
+A working trade.gov key is committed to `.env.example` deliberately, so that setting this up is
+one key and not two. It is free, read-only and not billable — it buys queries against a public
+government list and nothing else, with no account or spend behind it. Keys that cost money or
+carry an identity are left empty, which is the distinction being drawn rather than ignored. Get
+your own from the trade.gov developer portal if you would rather; it is sent as a
+`subscription-key` header, so it must be issued by that portal, not a generic api.data.gov key.
 
 `OPENAI_API_KEY` is optional and only used by `MODEL=openai`. Nothing here needs an Anthropic key.
 
@@ -94,7 +98,7 @@ pip install -r requirements.txt      # this project's dependencies
 pip install hermes-agent==0.19.0     # the runtime itself
 hermes profile create hermes-exercise
 
-cp .env.example .env                 # then put your two keys in it
+cp .env.example .env                 # then add your OpenRouter key
 export $(grep -v '^#' .env | grep -v '^$' | xargs)
 ```
 

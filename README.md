@@ -168,7 +168,7 @@ model on 8 GB is a proof that the swap works, not a good demo. There is an `olla
 profile too, but native is the documented path: Docker Desktop's memory allowance is usually
 below what a 64 K context needs.
 
-### Two things that will bite you
+### Three things that will bite you
 
 - **Stop any local `hermes gateway` / `uvicorn` before starting Docker.** They bind the same
   ports, and on macOS both can hold them, so you cannot tell which one answered.
@@ -176,6 +176,21 @@ below what a 64 K context needs.
   branches does not update it. `dev.sh` re-syncs it on every start, which is why you should
   launch through `dev.sh` rather than `hermes gateway` directly — a stale single-mode profile
   makes handoff fail silently.
+- **If `screen_party` fails to connect, suspect your DNS before this code.** `data.trade.gov` is
+  fronted by Azure and resolves through a five-hop CNAME chain, which some home routers' DNS
+  forwarders cannot follow. Every other endpoint here is one or two hops and keeps working, so it
+  looks like a broken tool rather than a broken lookup. This cost a day during development.
+
+  If the second line answers while the first fails, it is your router, not the API:
+
+  ```bash
+  python3 -c "import socket; print(socket.getaddrinfo('data.trade.gov',443)[0][4][0])"
+  dig +short @1.1.1.1 data.trade.gov
+  ```
+
+  **Fix:** set your machine's DNS to `1.1.1.1` and `8.8.8.8`, then flush the cache —
+  `sudo dscacheutil -flushcache; sudo killall -HUP mDNSResponder` on macOS. The Docker path
+  already pins both resolvers, so it cannot happen there.
 
 ---
 

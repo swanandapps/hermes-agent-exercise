@@ -36,8 +36,9 @@ services:
       - hermes-profile:/data/hermes
     # Pinned resolvers. A CDN-fronted government API (data.trade.gov resolves through a
     # five-hop Azure chain) intermittently failed against a consumer router's DNS
-    # forwarder during development — see docs/performance.md. Pinning here means the
-    # deployment cannot inherit that problem from whatever host it lands on.
+    # forwarder during development — see "Three things that will bite you" in the README.
+    # Pinning here means the deployment cannot inherit that problem from whatever host
+    # it lands on.
     dns:
       - 1.1.1.1
       - 8.8.8.8

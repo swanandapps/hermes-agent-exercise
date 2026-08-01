@@ -122,11 +122,25 @@ The UI shows every tool call, its arguments, how long it took and the model's re
 can watch the agent decide rather than just read its answer. Try `Screen Siemens AG` for a clean
 result, and `Screen Google` for a partial match that is deliberately **not** reported as a hit.
 
-### One thing that will bite you
+### Two things that will bite you
 
-The Hermes profile lives outside git (`~/.hermes/profiles/hermes-exercise/`), so switching
-branches does not update it. `dev.sh` re-syncs it on every start — which is why you should launch
-through `dev.sh` rather than calling `hermes gateway` directly.
+- **The Hermes profile lives outside git** (`~/.hermes/profiles/hermes-exercise/`), so switching
+  branches does not update it. `dev.sh` re-syncs it on every start — which is why you should
+  launch through `dev.sh` rather than calling `hermes gateway` directly.
+- **If `screen_party` fails to connect, suspect your DNS before this code.** `data.trade.gov` is
+  fronted by Azure and resolves through a five-hop CNAME chain, which some home routers' DNS
+  forwarders cannot follow. `comtradeapi.un.org` is one or two hops and keeps working, so it looks
+  like a broken tool rather than a broken lookup. This cost a day during development.
+
+  If the second line answers while the first fails, it is your router, not the API:
+
+  ```bash
+  python3 -c "import socket; print(socket.getaddrinfo('data.trade.gov',443)[0][4][0])"
+  dig +short @1.1.1.1 data.trade.gov
+  ```
+
+  **Fix:** set your machine's DNS to `1.1.1.1` and `8.8.8.8`, then flush the cache —
+  `sudo dscacheutil -flushcache; sudo killall -HUP mDNSResponder` on macOS.
 
 ---
 
